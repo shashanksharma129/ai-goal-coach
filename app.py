@@ -97,6 +97,10 @@ def main():
                     )
                     if r.status_code == 200:
                         st.success("Goal saved. Check the Saved goals tab.")
+                        for key in ("last_goal", "last_original_input"):
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
                     else:
                         body = _safe_json(r)
                         msg = body.get("message", r.text or "Save failed.")
