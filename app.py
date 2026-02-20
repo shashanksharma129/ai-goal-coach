@@ -103,8 +103,18 @@ def main():
                     st.error(f"Could not reach the API: {e}")
 
     with tab_saved:
+        page_size = 20
+        if "saved_goals_page" not in st.session_state:
+            st.session_state["saved_goals_page"] = 1
+        page = st.session_state["saved_goals_page"]
+        offset = (page - 1) * page_size
+
         try:
-            r = requests.get(f"{API_URL}/goals", params={"limit": 20, "offset": 0}, timeout=10)
+            r = requests.get(
+                f"{API_URL}/goals",
+                params={"limit": page_size, "offset": offset},
+                timeout=10,
+            )
         except requests.RequestException:
             st.error("Could not load saved goals. Try again.")
         else:
@@ -114,12 +124,29 @@ def main():
                 data = _safe_json(r)
                 goals = data.get("goals", [])
                 total = data.get("total", 0)
+                if not goals and offset > 0:
+                    st.session_state["saved_goals_page"] = 1
+                    st.rerun()
                 if not goals:
                     st.info("No saved goals yet. Use the Refine tab to create and save one.")
                 else:
+                    start = offset + 1
+                    end = offset + len(goals)
+                    st.caption(f"Showing {start}–{end} of {total}")
                     for g in goals:
                         st.write(g["refined_goal"])
                         st.caption(g.get("created_at", ""))
+                    col_prev, col_next = st.columns(2)
+                    with col_prev:
+                        if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
+                            if page > 1:
+                                st.session_state["saved_goals_page"] = page - 1
+                                st.rerun()
+                    with col_next:
+                        if st.button("Next", disabled=(offset + len(goals) >= total), key="next_goals"):
+                            if offset + len(goals) < total:
+                                st.session_state["saved_goals_page"] = page + 1
+                                st.rerun()
 
 
 if __name__ == "__main__":
