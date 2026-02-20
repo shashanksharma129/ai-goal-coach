@@ -1,0 +1,15 @@
+# ABOUTME: FastAPI backend image; uvicorn on port 8000.
+# ABOUTME: Set GEMINI_API_KEY and optionally GOALS_DB_PATH for SQLite.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    fastapi uvicorn sqlmodel pydantic google-adk google-genai python-dotenv
+
+COPY goal_coach/ ./goal_coach/
+COPY main.py database.py schemas.py telemetry.py ./
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,30 @@
+# ABOUTME: Runs API and Streamlit UI; API_URL and GEMINI_API_KEY for UI and API.
+# ABOUTME: Volume persists SQLite at ./data (GOALS_DB_PATH).
+# Set GEMINI_API_KEY in the host environment so the API container can call Gemini.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOALS_DB_PATH=/data/goals.db
+    volumes:
+      - goal_data:/data
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  goal_data: {}
