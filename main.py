@@ -4,12 +4,14 @@
 import json
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 
 load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+from sqlmodel import select
 
 from goal_coach.agent import generate_smart_goal
 from database import Goal, get_session
@@ -80,3 +82,27 @@ def post_goals(req: GoalCreateRequest):
             "status": goal.status,
             "created_at": goal.created_at.isoformat(),
         }
+
+
+@app.get("/goals")
+def get_goals(limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0)):
+    """List saved goals, newest first. Returns { goals: [...], total: N }."""
+    with get_session() as session:
+        total = len(list(session.exec(select(Goal))))
+        stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
+        goals = list(session.exec(stmt))
+    return {
+        "goals": [
+            {
+                "id": str(g.id),
+                "original_input": g.original_input,
+                "refined_goal": g.refined_goal,
+                "key_results": json.loads(g.key_results),
+                "confidence_score": g.confidence_score,
+                "status": g.status,
+                "created_at": g.created_at.isoformat(),
+            }
+            for g in goals
+        ],
+        "total": total,
+    }

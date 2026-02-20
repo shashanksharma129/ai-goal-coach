@@ -106,3 +106,19 @@ def test_post_goals_persists(in_memory_engine):
         goals = list(session.exec(select(Goal)))
         assert len(goals) == 1
         assert goals[0].refined_goal == "Read 12 books per year."
+
+
+def test_get_goals_empty_returns_200_and_empty_list(in_memory_engine):
+    """GET /goals with no goals in DB returns 200 and { goals: [], total: 0 }."""
+    @contextmanager
+    def fake_get_session():
+        with Session(in_memory_engine) as s:
+            yield s
+
+    with patch("main.get_session", fake_get_session):
+        client = TestClient(app)
+        resp = client.get("/goals")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["goals"] == []
+    assert data["total"] == 0
