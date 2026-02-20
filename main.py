@@ -1,4 +1,4 @@
-# ABOUTME: FastAPI app: POST /generate (goal refinement) and POST /goals (persist).
+# ABOUTME: FastAPI app: POST /generate (goal refinement), POST /goals (persist), GET /goals (list, paginated).
 # ABOUTME: 400 on low confidence, 502 on agent/schema failure.
 
 import json
@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from sqlalchemy import func
 from sqlmodel import select
 
 from goal_coach.agent import generate_smart_goal
@@ -88,7 +89,7 @@ def post_goals(req: GoalCreateRequest):
 def get_goals(limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0)):
     """List saved goals, newest first. Returns { goals: [...], total: N }."""
     with get_session() as session:
-        total = len(list(session.exec(select(Goal))))
+        total = session.exec(select(func.count()).select_from(Goal)).one()
         stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
         goals = list(session.exec(stmt))
     return {
