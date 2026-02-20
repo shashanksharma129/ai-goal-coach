@@ -107,3 +107,7 @@
   - Set up a named Docker volume to persist the SQLite `goals.db` file in the `api` service.
 - **Final Launch:** Run `docker-compose up --build`.
 - **Final Verification:** Access `http://localhost:8501`, test a goal, and verify logs show up in the Docker console.
+
+## Backlog (from PR / Gemini review – to implement after brainstorming and planning)
+
+- **Authentication and user-scoped goals (security):** The `GET /goals` endpoint returns all goal records without authentication or user-based filtering. In a multi-user environment this would allow any unauthenticated user to access other users’ goals (PII). **Remediation:** Implement an authentication mechanism (e.g. JWT, OAuth2), add a user reference to the `Goal` model, and update `GET /goals` (and `POST /goals` if needed) so that only goals belonging to the authenticated user are returned. Do this as a separate effort: brainstorm, then write an implementation plan, then implement.

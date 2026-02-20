@@ -25,6 +25,18 @@ def in_memory_engine():
     return engine
 
 
+@pytest.fixture
+def fake_get_session(in_memory_engine):
+    """Context manager that yields a session on the in-memory engine; use with patch('main.get_session', fake_get_session)."""
+
+    @contextmanager
+    def _fake():
+        with Session(in_memory_engine) as s:
+            yield s
+
+    return _fake
+
+
 @patch("main.get_session")
 @patch("main.generate_smart_goal")
 def test_generate_success(mock_generate, mock_get_session):
@@ -76,13 +88,8 @@ def test_generate_502_on_exception(mock_generate):
     assert resp.json()["message"] == "AI model failed to generate a valid response."
 
 
-def test_post_goals_persists(in_memory_engine):
+def test_post_goals_persists(fake_get_session, in_memory_engine):
     """POST /goals saves to DB and returns the created record."""
-    @contextmanager
-    def fake_get_session():
-        with Session(in_memory_engine) as s:
-            yield s
-
     with patch("main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.post(
@@ -106,3 +113,57 @@ def test_post_goals_persists(in_memory_engine):
         goals = list(session.exec(select(Goal)))
         assert len(goals) == 1
         assert goals[0].refined_goal == "Read 12 books per year."
+
+
+def test_get_goals_empty_returns_200_and_empty_list(fake_get_session):
+    """GET /goals with no goals in DB returns 200 and { goals: [], total: 0 }."""
+    with patch("main.get_session", fake_get_session):
+        client = TestClient(app)
+        resp = client.get("/goals")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["goals"] == []
+    assert data["total"] == 0
+
+
+def test_get_goals_returns_newest_first_with_pagination(fake_get_session):
+    """GET /goals returns goals newest first; limit and offset work."""
+    with patch("main.get_session", fake_get_session):
+        client = TestClient(app)
+        for i in range(3):
+            client.post(
+                "/goals",
+                json={
+                    "original_input": f"input{i}",
+                    "refined_goal": f"goal{i}",
+                    "key_results": ["A", "B", "C"],
+                    "confidence_score": 0.8,
+                    "status": "saved",
+                },
+            )
+        resp = client.get("/goals")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+        assert len(data["goals"]) == 3
+        assert data["goals"][0]["refined_goal"] == "goal2"
+        assert data["goals"][1]["refined_goal"] == "goal1"
+        assert data["goals"][2]["refined_goal"] == "goal0"
+
+        resp2 = client.get("/goals?limit=2&offset=1")
+        assert resp2.status_code == 200
+        data2 = resp2.json()
+        assert data2["total"] == 3
+        assert len(data2["goals"]) == 2
+        assert data2["goals"][0]["refined_goal"] == "goal1"
+        assert data2["goals"][1]["refined_goal"] == "goal0"
+
+
+def test_get_goals_invalid_params_return_422(fake_get_session):
+    """GET /goals with negative offset or limit returns 422."""
+    with patch("main.get_session", fake_get_session):
+        client = TestClient(app)
+        resp = client.get("/goals?offset=-1")
+        assert resp.status_code == 422
+        resp2 = client.get("/goals?limit=-1")
+        assert resp2.status_code == 422
