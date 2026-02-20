@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
 from goal_coach.agent import generate_smart_goal
@@ -100,6 +101,12 @@ def get_goals(limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0)
             stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
             goals = list(session.exec(stmt))
         return {"goals": [_goal_to_json(g) for g in goals], "total": total}
+    except SQLAlchemyError:
+        logging.exception("get_goals failed (database error)")
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Could not load goals."},
+        )
     except Exception:
         logging.exception("get_goals failed")
         return JSONResponse(
