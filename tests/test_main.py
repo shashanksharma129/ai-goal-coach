@@ -88,13 +88,8 @@ def test_generate_502_on_exception(mock_generate):
     assert resp.json()["message"] == "AI model failed to generate a valid response."
 
 
-def test_post_goals_persists(in_memory_engine):
+def test_post_goals_persists(fake_get_session, in_memory_engine):
     """POST /goals saves to DB and returns the created record."""
-    @contextmanager
-    def fake_get_session():
-        with Session(in_memory_engine) as s:
-            yield s
-
     with patch("main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.post(
