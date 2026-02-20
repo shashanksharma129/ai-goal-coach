@@ -103,7 +103,23 @@ def main():
                     st.error(f"Could not reach the API: {e}")
 
     with tab_saved:
-        st.write("Loading saved goals…")
+        try:
+            r = requests.get(f"{API_URL}/goals", params={"limit": 20, "offset": 0}, timeout=10)
+        except requests.RequestException:
+            st.error("Could not load saved goals. Try again.")
+        else:
+            if r.status_code != 200:
+                st.error("Could not load saved goals. Try again.")
+            else:
+                data = _safe_json(r)
+                goals = data.get("goals", [])
+                total = data.get("total", 0)
+                if not goals:
+                    st.info("No saved goals yet. Use the Refine tab to create and save one.")
+                else:
+                    for g in goals:
+                        st.write(g["refined_goal"])
+                        st.caption(g.get("created_at", ""))
 
 
 if __name__ == "__main__":
