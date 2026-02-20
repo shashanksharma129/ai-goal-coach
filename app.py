@@ -2,8 +2,10 @@
 # ABOUTME: API URL configurable via API_URL env (default http://localhost:8000).
 
 import os
-import streamlit as st
+from datetime import datetime
+
 import requests
+import streamlit as st
 
 try:
     from dotenv import load_dotenv
@@ -134,19 +136,30 @@ def main():
                     end = offset + len(goals)
                     st.caption(f"Showing {start}–{end} of {total}")
                     for g in goals:
+                        st.caption("**Refined goal**")
                         st.write(g["refined_goal"])
-                        st.caption(g.get("created_at", ""))
+                        if g.get("key_results"):
+                            st.caption("**Key results**")
+                            for kr in g["key_results"]:
+                                st.markdown(f"- {kr}")
+                        created = g.get("created_at", "")
+                        if created:
+                            try:
+                                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                                created = dt.strftime("%b %d, %Y")
+                            except Exception:
+                                pass
+                            st.caption(f"Saved: {created}")
+                        st.divider()
                     col_prev, col_next = st.columns(2)
                     with col_prev:
                         if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
-                            if page > 1:
-                                st.session_state["saved_goals_page"] = page - 1
-                                st.rerun()
+                            st.session_state["saved_goals_page"] = page - 1
+                            st.rerun()
                     with col_next:
                         if st.button("Next", disabled=(offset + len(goals) >= total), key="next_goals"):
-                            if offset + len(goals) < total:
-                                st.session_state["saved_goals_page"] = page + 1
-                                st.rerun()
+                            st.session_state["saved_goals_page"] = page + 1
+                            st.rerun()
 
 
 if __name__ == "__main__":
