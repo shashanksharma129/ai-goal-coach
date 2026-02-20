@@ -1,4 +1,4 @@
-# ABOUTME: Streamlit UI for AI Goal Coach; calls FastAPI backend for generate and save.
+# ABOUTME: Streamlit UI: Refine tab (generate + save) and Saved goals tab (GET /goals list with pagination).
 # ABOUTME: API URL configurable via API_URL env (default http://localhost:8000).
 
 import os
@@ -119,47 +119,47 @@ def main():
             )
         except requests.RequestException:
             st.error("Could not load saved goals. Try again.")
-        else:
-            if r.status_code != 200:
-                st.error("Could not load saved goals. Try again.")
-            else:
-                data = _safe_json(r)
-                goals = data.get("goals", [])
-                total = data.get("total", 0)
-                if not goals and offset > 0:
-                    st.session_state["saved_goals_page"] = 1
-                    st.rerun()
-                if not goals:
-                    st.info("No saved goals yet. Use the Refine tab to create and save one.")
-                else:
-                    start = offset + 1
-                    end = offset + len(goals)
-                    st.caption(f"Showing {start}–{end} of {total}")
-                    for g in goals:
-                        st.caption("**Refined goal**")
-                        st.write(g["refined_goal"])
-                        if g.get("key_results"):
-                            st.caption("**Key results**")
-                            for kr in g["key_results"]:
-                                st.markdown(f"- {kr}")
-                        created = g.get("created_at", "")
-                        if created:
-                            try:
-                                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                                created = dt.strftime("%b %d, %Y")
-                            except Exception:
-                                pass
-                            st.caption(f"Saved: {created}")
-                        st.divider()
-                    col_prev, col_next = st.columns(2)
-                    with col_prev:
-                        if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
-                            st.session_state["saved_goals_page"] = page - 1
-                            st.rerun()
-                    with col_next:
-                        if st.button("Next", disabled=(offset + len(goals) >= total), key="next_goals"):
-                            st.session_state["saved_goals_page"] = page + 1
-                            st.rerun()
+            return
+        if r.status_code != 200:
+            st.error("Could not load saved goals. Try again.")
+            return
+        data = _safe_json(r)
+        goals = data.get("goals", [])
+        total = data.get("total", 0)
+        if not goals and offset > 0:
+            st.session_state["saved_goals_page"] = 1
+            st.rerun()
+        if not goals:
+            st.info("No saved goals yet. Use the Refine tab to create and save one.")
+            return
+        start = offset + 1
+        end = offset + len(goals)
+        st.caption(f"Showing {start}–{end} of {total}")
+        for g in goals:
+            st.caption("**Refined goal**")
+            st.write(g["refined_goal"])
+            if g.get("key_results"):
+                st.caption("**Key results**")
+                for kr in g["key_results"]:
+                    st.markdown(f"- {kr}")
+            created = g.get("created_at", "")
+            if created:
+                try:
+                    dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                    created = dt.strftime("%b %d, %Y")
+                except ValueError:
+                    pass
+                st.caption(f"Saved: {created}")
+            st.divider()
+        col_prev, col_next = st.columns(2)
+        with col_prev:
+            if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
+                st.session_state["saved_goals_page"] = page - 1
+                st.rerun()
+        with col_next:
+            if st.button("Next", disabled=(offset + len(goals) >= total), key="next_goals"):
+                st.session_state["saved_goals_page"] = page + 1
+                st.rerun()
 
 
 if __name__ == "__main__":

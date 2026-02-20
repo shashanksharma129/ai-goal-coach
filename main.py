@@ -18,6 +18,20 @@ from goal_coach.agent import generate_smart_goal
 from database import Goal, get_session
 from schemas import GoalModel
 
+
+def _goal_to_json(goal: Goal) -> dict:
+    """Serialize a Goal row to the same dict shape as POST /goals response."""
+    return {
+        "id": str(goal.id),
+        "original_input": goal.original_input,
+        "refined_goal": goal.refined_goal,
+        "key_results": json.loads(goal.key_results),
+        "confidence_score": goal.confidence_score,
+        "status": goal.status,
+        "created_at": goal.created_at.isoformat(),
+    }
+
+
 app = FastAPI(title="AI Goal Coach API")
 # allow_origins=["*"] is for prototype/dev only; set explicit origins before production.
 app.add_middleware(
@@ -74,36 +88,21 @@ def post_goals(req: GoalCreateRequest):
         session.add(goal)
         session.commit()
         session.refresh(goal)
-        return {
-            "id": str(goal.id),
-            "original_input": goal.original_input,
-            "refined_goal": goal.refined_goal,
-            "key_results": json.loads(goal.key_results),
-            "confidence_score": goal.confidence_score,
-            "status": goal.status,
-            "created_at": goal.created_at.isoformat(),
-        }
+        return _goal_to_json(goal)
 
 
 @app.get("/goals")
 def get_goals(limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0)):
     """List saved goals, newest first. Returns { goals: [...], total: N }."""
-    with get_session() as session:
-        total = session.exec(select(func.count()).select_from(Goal)).one()
-        stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
-        goals = list(session.exec(stmt))
-    return {
-        "goals": [
-            {
-                "id": str(g.id),
-                "original_input": g.original_input,
-                "refined_goal": g.refined_goal,
-                "key_results": json.loads(g.key_results),
-                "confidence_score": g.confidence_score,
-                "status": g.status,
-                "created_at": g.created_at.isoformat(),
-            }
-            for g in goals
-        ],
-        "total": total,
-    }
+    try:
+        with get_session() as session:
+            total = session.exec(select(func.count()).select_from(Goal)).one()
+            stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
+            goals = list(session.exec(stmt))
+        return {"goals": [_goal_to_json(g) for g in goals], "total": total}
+    except Exception:
+        logging.exception("get_goals failed")
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Could not load goals."},
+        )
