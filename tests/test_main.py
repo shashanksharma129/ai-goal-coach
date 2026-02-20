@@ -160,3 +160,18 @@ def test_get_goals_returns_newest_first_with_pagination(in_memory_engine):
         assert len(data2["goals"]) == 2
         assert data2["goals"][0]["refined_goal"] == "goal1"
         assert data2["goals"][1]["refined_goal"] == "goal0"
+
+
+def test_get_goals_invalid_params_return_422(in_memory_engine):
+    """GET /goals with negative offset or limit returns 422."""
+    @contextmanager
+    def fake_get_session():
+        with Session(in_memory_engine) as s:
+            yield s
+
+    with patch("main.get_session", fake_get_session):
+        client = TestClient(app)
+        resp = client.get("/goals?offset=-1")
+        assert resp.status_code == 422
+        resp2 = client.get("/goals?limit=-1")
+        assert resp2.status_code == 422
