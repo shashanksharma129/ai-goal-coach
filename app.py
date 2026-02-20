@@ -121,7 +121,9 @@ def main():
             st.error("Could not load saved goals. Try again.")
             return
         if r.status_code != 200:
-            st.error("Could not load saved goals. Try again.")
+            body = _safe_json(r)
+            msg = body.get("message", "Could not load saved goals. Try again.")
+            st.error(msg)
             return
         data = _safe_json(r)
         goals = data.get("goals", [])
@@ -144,12 +146,13 @@ def main():
                     st.markdown(f"- {kr}")
             created = g.get("created_at", "")
             if created:
+                date_str = created
                 try:
                     dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                    created = dt.strftime("%b %d, %Y")
+                    date_str = dt.strftime("%b %d, %Y")
                 except ValueError:
                     pass
-                st.caption(f"Saved: {created}")
+                st.caption(f"Saved: {date_str}")
             st.divider()
         col_prev, col_next = st.columns(2)
         with col_prev:

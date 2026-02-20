@@ -25,6 +25,18 @@ def in_memory_engine():
     return engine
 
 
+@pytest.fixture
+def fake_get_session(in_memory_engine):
+    """Context manager that yields a session on the in-memory engine; use with patch('main.get_session', fake_get_session)."""
+
+    @contextmanager
+    def _fake():
+        with Session(in_memory_engine) as s:
+            yield s
+
+    return _fake
+
+
 @patch("main.get_session")
 @patch("main.generate_smart_goal")
 def test_generate_success(mock_generate, mock_get_session):
@@ -108,13 +120,8 @@ def test_post_goals_persists(in_memory_engine):
         assert goals[0].refined_goal == "Read 12 books per year."
 
 
-def test_get_goals_empty_returns_200_and_empty_list(in_memory_engine):
+def test_get_goals_empty_returns_200_and_empty_list(fake_get_session):
     """GET /goals with no goals in DB returns 200 and { goals: [], total: 0 }."""
-    @contextmanager
-    def fake_get_session():
-        with Session(in_memory_engine) as s:
-            yield s
-
     with patch("main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.get("/goals")
@@ -124,13 +131,8 @@ def test_get_goals_empty_returns_200_and_empty_list(in_memory_engine):
     assert data["total"] == 0
 
 
-def test_get_goals_returns_newest_first_with_pagination(in_memory_engine):
+def test_get_goals_returns_newest_first_with_pagination(fake_get_session):
     """GET /goals returns goals newest first; limit and offset work."""
-    @contextmanager
-    def fake_get_session():
-        with Session(in_memory_engine) as s:
-            yield s
-
     with patch("main.get_session", fake_get_session):
         client = TestClient(app)
         for i in range(3):
@@ -162,13 +164,8 @@ def test_get_goals_returns_newest_first_with_pagination(in_memory_engine):
         assert data2["goals"][1]["refined_goal"] == "goal0"
 
 
-def test_get_goals_invalid_params_return_422(in_memory_engine):
+def test_get_goals_invalid_params_return_422(fake_get_session):
     """GET /goals with negative offset or limit returns 422."""
-    @contextmanager
-    def fake_get_session():
-        with Session(in_memory_engine) as s:
-            yield s
-
     with patch("main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.get("/goals?offset=-1")
