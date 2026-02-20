@@ -117,8 +117,8 @@ def main():
                 params={"limit": page_size, "offset": offset},
                 timeout=10,
             )
-        except requests.RequestException:
-            st.error("Could not load saved goals. Try again.")
+        except requests.RequestException as e:
+            st.error(f"Could not load saved goals. Try again. Error: {e}")
             return
         if r.status_code != 200:
             body = _safe_json(r)

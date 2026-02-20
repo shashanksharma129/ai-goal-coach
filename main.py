@@ -61,8 +61,8 @@ def post_generate(req: GenerateRequest):
     """Generate a refined SMART goal from vague user input."""
     try:
         result = generate_smart_goal(req.user_input)
-    except Exception:
-        logging.exception("generate_smart_goal failed")
+    except Exception as e:
+        logging.exception("generate_smart_goal failed: %s", e)
         return JSONResponse(
             status_code=502,
             content={"message": "AI model failed to generate a valid response."},
@@ -78,18 +78,31 @@ def post_generate(req: GenerateRequest):
 @app.post("/goals")
 def post_goals(req: GoalCreateRequest):
     """Persist an approved goal to the database."""
-    with get_session() as session:
-        goal = Goal(
-            original_input=req.original_input,
-            refined_goal=req.refined_goal,
-            key_results=json.dumps(req.key_results),
-            confidence_score=req.confidence_score,
-            status=req.status,
+    try:
+        with get_session() as session:
+            goal = Goal(
+                original_input=req.original_input,
+                refined_goal=req.refined_goal,
+                key_results=json.dumps(req.key_results),
+                confidence_score=req.confidence_score,
+                status=req.status,
+            )
+            session.add(goal)
+            session.commit()
+            session.refresh(goal)
+            return _goal_to_json(goal)
+    except SQLAlchemyError as e:
+        logging.exception("post_goals failed (database error): %s", e)
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Could not save goal."},
         )
-        session.add(goal)
-        session.commit()
-        session.refresh(goal)
-        return _goal_to_json(goal)
+    except Exception as e:
+        logging.exception("post_goals failed unexpectedly: %s", e)
+        return JSONResponse(
+            status_code=500,
+            content={"message": "An unexpected error occurred while saving the goal."},
+        )
 
 
 @app.get("/goals")
@@ -101,15 +114,15 @@ def get_goals(limit: int = Query(20, ge=0, le=100), offset: int = Query(0, ge=0)
             stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
             goals = list(session.exec(stmt))
         return {"goals": [_goal_to_json(g) for g in goals], "total": total}
-    except SQLAlchemyError:
-        logging.exception("get_goals failed (database error)")
+    except SQLAlchemyError as e:
+        logging.exception("get_goals failed (database error): %s", e)
         return JSONResponse(
             status_code=500,
             content={"message": "Could not load goals."},
         )
-    except Exception:
-        logging.exception("get_goals failed")
+    except Exception as e:
+        logging.exception("get_goals failed unexpectedly: %s", e)
         return JSONResponse(
             status_code=500,
-            content={"message": "Could not load goals."},
+            content={"message": "An unexpected error occurred while loading goals."},
         )
