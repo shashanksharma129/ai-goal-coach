@@ -52,8 +52,8 @@ Update this README when any of these are adopted.
 
 ## Architecture overview
 
-- **UI:** [Streamlit](app.py) → POST `/generate` and POST `/goals` to the API.
-- **API:** [FastAPI](main.py) → calls [goal_coach](goal_coach/agent.py) (`generate_smart_goal`) and [database](database.py) (persist goals). Returns 400 when confidence &lt; 0.5, 502 on model/schema failure.
+- **UI:** [Streamlit](app.py) – two tabs: **Refine** (input → POST `/generate`, view result, POST `/goals` to save) and **Saved goals** (GET `/goals`, list saved goals with pagination).
+- **API:** [FastAPI](main.py) → POST `/generate`, POST `/goals`, GET `/goals` (list, newest first, paginated). Calls [goal_coach](goal_coach/agent.py) (`generate_smart_goal`) and [database](database.py). Returns 400 when confidence &lt; 0.5, 502 on model/schema failure.
 - **Agent:** [goal_coach](goal_coach/agent.py) – Google ADK Agent with `output_schema=GoalModel`, model `gemini-2.5-flash`. [Telemetry](telemetry.py) logs one JSON line per run to stdout.
 - **Storage:** SQLite ([Goal](database.py) table); path via `GOALS_DB_PATH` (default `goals.db`).
 
@@ -98,7 +98,8 @@ See [spec.md](spec.md) for the full system specification.
 
 5. **Use the app**
    - Open http://localhost:8501.
-   - Enter a goal or aspiration, click "Refine Goal", then "Save Approved Goal" if you want to persist it.
+   - **Refine** tab: Enter a goal or aspiration, click "Refine Goal", then "Save Approved Goal" to persist it.
+   - **Saved goals** tab: View all saved goals (newest first) with pagination.
 
 6. **Optional: ADK web UI**
    From the project root: `uv run adk web` (discovers the `goal_coach` agent).
