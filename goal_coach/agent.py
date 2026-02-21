@@ -35,16 +35,16 @@ confidence_score should be high (e.g. 0.7-1.0) when the input is a genuine goal 
 
 
 def _sanitize_user_input(raw: str | None) -> str:
-    """Truncate, strip null bytes and delimiting tags to limit prompt injection. Non-str input is normalized to empty string."""
+    """Truncate, strip null bytes, and escape angle brackets to prevent tag breakout. Non-str input is normalized to empty string."""
     if not isinstance(raw, str):
         return ""
     # Truncate early to avoid processing maliciously large strings in memory.
     bounded = raw[: MAX_USER_INPUT_LENGTH * _TRUNCATION_BUFFER_MULTIPLIER]
-    # Remove null bytes and delimiting tags so user cannot break out of <user_goal>...</user_goal>.
+    # Escape angle brackets so no tag (any case or nesting) can form and break out of <user_goal> block.
     cleaned = (
         bounded.replace("\x00", "")
-        .replace("</user_goal>", "")
-        .replace("<user_goal>", "")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
         .strip()
     )
     return cleaned[:MAX_USER_INPUT_LENGTH]
