@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from database import Goal
+from core.database import Goal
 from main import app
-from schemas import GoalModel
+from core.schemas import GoalModel
 
 
 @pytest.fixture

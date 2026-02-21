@@ -2,7 +2,6 @@
 # ABOUTME: Gemini 2.5 Flash pricing: $0.075/1M input, $0.30/1M output.
 
 import json
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 

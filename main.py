@@ -16,9 +16,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
 from goal_coach.agent import generate_smart_goal
-from config import DEFAULT_GOALS_PAGE_SIZE, MAX_GOALS_PAGE_SIZE
-from database import Goal, get_session
-from schemas import GoalModel
+from core.config import DEFAULT_GOALS_PAGE_SIZE, MAX_GOALS_PAGE_SIZE
+from core.database import Goal, get_session
+from core.schemas import GoalModel
 
 
 def _goal_to_json(goal: Goal) -> dict:

@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-from config import DEFAULT_GOALS_PAGE_SIZE
+from core.config import DEFAULT_GOALS_PAGE_SIZE
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 

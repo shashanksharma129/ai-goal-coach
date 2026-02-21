@@ -7,7 +7,7 @@ from uuid import uuid4
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from database import Goal
+from core.database import Goal
 
 
 @pytest.fixture

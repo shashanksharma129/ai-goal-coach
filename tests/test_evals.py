@@ -3,7 +3,7 @@
 
 import pytest
 from goal_coach.agent import generate_smart_goal
-from schemas import GoalModel
+from core.schemas import GoalModel
 
 
 def _assert_valid_goal_model(result: GoalModel, min_confidence: float = 0.5) -> None:

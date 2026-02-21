@@ -12,7 +12,7 @@ from goal_coach.agent import (
     generate_smart_goal,
     MAX_USER_INPUT_LENGTH,
 )
-from schemas import GoalModel
+from core.schemas import GoalModel
 
 
 def test_sanitize_user_input_strips_null_bytes():

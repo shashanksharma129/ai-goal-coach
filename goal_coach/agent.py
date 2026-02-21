@@ -10,8 +10,8 @@ from google.adk import Agent, Runner
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
-from schemas import GoalModel
-from telemetry import log_run
+from core.schemas import GoalModel
+from core.telemetry import log_run
 
 APP_NAME = "ai_goal_coach"
 MAX_USER_INPUT_LENGTH = 2000
