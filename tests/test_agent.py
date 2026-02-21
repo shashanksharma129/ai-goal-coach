@@ -1,11 +1,26 @@
 # ABOUTME: Pytest tests for generate_smart_goal and telemetry; mocks ADK Runner/Agent.
 # ABOUTME: Verifies GoalModel return and telemetry log_run invocation.
 
-import pytest
+from datetime import date
 from unittest.mock import MagicMock, patch
 
-from goal_coach.agent import generate_smart_goal
+import pytest
+
+from goal_coach.agent import _goal_instruction_provider, generate_smart_goal
 from schemas import GoalModel
+
+
+@patch("goal_coach.agent.date")
+def test_goal_instruction_provider_includes_current_date(mock_date):
+    """Instruction provider returns full instruction with today's date in ISO form."""
+    mock_date.today.return_value = date(2026, 2, 20)
+    ctx = MagicMock()
+
+    instruction = _goal_instruction_provider(ctx)
+
+    assert "Today's date is 2026-02-20." in instruction
+    assert "SMART criteria" in instruction
+    assert "Time-bound" in instruction
 
 
 def _event_with_final_content(json_text: str) -> MagicMock:
