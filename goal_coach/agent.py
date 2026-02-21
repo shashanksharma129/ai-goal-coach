@@ -15,7 +15,6 @@ from telemetry import log_run
 
 APP_NAME = "ai_goal_coach"
 MAX_USER_INPUT_LENGTH = 2000
-_TRUNCATION_BUFFER_MULTIPLIER = 2
 
 GOAL_INSTRUCTION = """You are an AI goal coach. Given a vague goal or aspiration from the user, produce a refined SMART goal and 3-5 measurable key results.
 
@@ -35,19 +34,18 @@ confidence_score should be high (e.g. 0.7-1.0) when the input is a genuine goal 
 
 
 def _sanitize_user_input(raw: str | None) -> str:
-    """Truncate, strip null bytes, and escape angle brackets to prevent tag breakout. Non-str input is normalized to empty string."""
+    """Truncate raw input to limit, then strip null bytes and escape angle brackets to prevent tag breakout. Non-str input is normalized to empty string."""
     if not isinstance(raw, str):
         return ""
-    # Truncate early to avoid processing maliciously large strings in memory.
-    bounded = raw[: MAX_USER_INPUT_LENGTH * _TRUNCATION_BUFFER_MULTIPLIER]
+    # Truncate raw first so user content is respected up to the limit and we avoid broken entities from truncating after escaping.
+    bounded = raw[:MAX_USER_INPUT_LENGTH]
     # Escape angle brackets so no tag (any case or nesting) can form and break out of <user_goal> block.
-    cleaned = (
+    return (
         bounded.replace("\x00", "")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .strip()
     )
-    return cleaned[:MAX_USER_INPUT_LENGTH]
 
 
 def _goal_instruction_provider(_ctx: ReadonlyContext) -> str:
