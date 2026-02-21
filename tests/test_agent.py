@@ -6,8 +6,37 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from goal_coach.agent import _goal_instruction_provider, generate_smart_goal
+from goal_coach.agent import (
+    _goal_instruction_provider,
+    _sanitize_user_input,
+    generate_smart_goal,
+)
 from schemas import GoalModel
+
+
+def test_sanitize_user_input_strips_null_bytes():
+    """Null bytes are removed to reduce prompt injection surface."""
+    assert _sanitize_user_input("hello\x00world") == "helloworld"
+    assert _sanitize_user_input("\x00\x00") == ""
+
+
+def test_sanitize_user_input_truncates_at_max_length():
+    """Input longer than MAX_USER_INPUT_LENGTH is truncated."""
+    long_input = "x" * 3000
+    result = _sanitize_user_input(long_input)
+    assert len(result) == 2000
+    assert result == "x" * 2000
+
+
+def test_sanitize_user_input_empty_and_whitespace():
+    """Empty and whitespace-only input is preserved as stripped empty string."""
+    assert _sanitize_user_input("") == ""
+    assert _sanitize_user_input("  ") == ""
+
+
+def test_sanitize_user_input_non_string_returns_empty():
+    """Non-string input is normalized to empty string (defensive)."""
+    assert _sanitize_user_input(None) == ""  # type: ignore[arg-type]
 
 
 @patch("goal_coach.agent.date")
