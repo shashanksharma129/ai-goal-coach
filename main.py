@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
 from goal_coach.agent import generate_smart_goal
-from config import DEFAULT_GOALS_PAGE_SIZE
+from config import DEFAULT_GOALS_PAGE_SIZE, MAX_GOALS_PAGE_SIZE
 from database import Goal, get_session
 from schemas import GoalModel
 
@@ -107,7 +107,7 @@ def post_goals(req: GoalCreateRequest):
 
 
 @app.get("/goals")
-def get_goals(limit: int = Query(DEFAULT_GOALS_PAGE_SIZE, ge=0, le=100), offset: int = Query(0, ge=0)):
+def get_goals(limit: int = Query(DEFAULT_GOALS_PAGE_SIZE, ge=0, le=MAX_GOALS_PAGE_SIZE), offset: int = Query(0, ge=0)):
     """List saved goals, newest first. Returns { goals: [...], total: N }."""
     try:
         with get_session() as session:
