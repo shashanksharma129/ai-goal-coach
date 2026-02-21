@@ -10,6 +10,7 @@ from goal_coach.agent import (
     _goal_instruction_provider,
     _sanitize_user_input,
     generate_smart_goal,
+    MAX_USER_INPUT_LENGTH,
 )
 from schemas import GoalModel
 
@@ -22,10 +23,10 @@ def test_sanitize_user_input_strips_null_bytes():
 
 def test_sanitize_user_input_truncates_at_max_length():
     """Input longer than MAX_USER_INPUT_LENGTH is truncated."""
-    long_input = "x" * 3000
+    long_input = "x" * (MAX_USER_INPUT_LENGTH + 1000)
     result = _sanitize_user_input(long_input)
-    assert len(result) == 2000
-    assert result == "x" * 2000
+    assert len(result) == MAX_USER_INPUT_LENGTH
+    assert result == "x" * MAX_USER_INPUT_LENGTH
 
 
 def test_sanitize_user_input_empty_and_whitespace():
@@ -36,7 +37,7 @@ def test_sanitize_user_input_empty_and_whitespace():
 
 def test_sanitize_user_input_non_string_returns_empty():
     """Non-string input is normalized to empty string (defensive)."""
-    assert _sanitize_user_input(None) == ""  # type: ignore[arg-type]
+    assert _sanitize_user_input(None) == ""
 
 
 def test_sanitize_user_input_strips_delimiting_tags():
@@ -70,6 +71,24 @@ def _event_with_final_content(json_text: str) -> MagicMock:
     event.content = content
     event.usage_metadata = None
     return event
+
+
+@patch("goal_coach.agent._runner")
+def test_generate_smart_goal_sends_wrapped_user_input_to_runner(mock_runner):
+    """generate_smart_goal passes user input wrapped in <user_goal> tags to the runner."""
+    goal_json = '''{"refined_goal": "Run a marathon.", "key_results": ["A", "B", "C"], "confidence_score": 0.8}'''
+    mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
+
+    generate_smart_goal("Run a marathon.")
+
+    mock_runner.run.assert_called_once()
+    call_kw = mock_runner.run.call_args.kwargs
+    new_message = call_kw["new_message"]
+    assert new_message.parts
+    text = new_message.parts[0].text
+    assert "<user_goal>" in text
+    assert "</user_goal>" in text
+    assert "Run a marathon." in text
 
 
 @patch("goal_coach.agent._runner")
