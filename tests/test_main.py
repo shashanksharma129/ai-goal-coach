@@ -10,7 +10,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
 from core.database import Goal
-from main import app
+from api.main import app
 from core.schemas import GoalModel
 
 
@@ -27,7 +27,7 @@ def in_memory_engine():
 
 @pytest.fixture
 def fake_get_session(in_memory_engine):
-    """Context manager that yields a session on the in-memory engine; use with patch('main.get_session', fake_get_session)."""
+    """Context manager that yields a session on the in-memory engine; use with patch('api.main.get_session', fake_get_session)."""
 
     @contextmanager
     def _fake():
@@ -37,8 +37,8 @@ def fake_get_session(in_memory_engine):
     return _fake
 
 
-@patch("main.get_session")
-@patch("main.generate_smart_goal")
+@patch("api.main.get_session")
+@patch("api.main.generate_smart_goal")
 def test_generate_success(mock_generate, mock_get_session):
     """Successful /generate returns 200 and GoalModel JSON."""
     mock_generate.return_value = GoalModel(
@@ -58,7 +58,7 @@ def test_generate_success(mock_generate, mock_get_session):
     assert len(data["key_results"]) == 3
 
 
-@patch("main.generate_smart_goal")
+@patch("api.main.generate_smart_goal")
 def test_generate_400_low_confidence(mock_generate):
     """When confidence_score < 0.5, /generate returns 400 with message."""
     mock_generate.return_value = GoalModel(
@@ -75,7 +75,7 @@ def test_generate_400_low_confidence(mock_generate):
     assert resp.json()["message"] == "Input too vague or invalid to generate a goal."
 
 
-@patch("main.generate_smart_goal")
+@patch("api.main.generate_smart_goal")
 def test_generate_502_on_exception(mock_generate):
     """When generate_smart_goal raises, /generate returns 502 with message."""
     mock_generate.side_effect = ValueError("ADK failed")
@@ -90,7 +90,7 @@ def test_generate_502_on_exception(mock_generate):
 
 def test_post_goals_persists(fake_get_session, in_memory_engine):
     """POST /goals saves to DB and returns the created record."""
-    with patch("main.get_session", fake_get_session):
+    with patch("api.main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.post(
             "/goals",
@@ -117,7 +117,7 @@ def test_post_goals_persists(fake_get_session, in_memory_engine):
 
 def test_get_goals_empty_returns_200_and_empty_list(fake_get_session):
     """GET /goals with no goals in DB returns 200 and { goals: [], total: 0 }."""
-    with patch("main.get_session", fake_get_session):
+    with patch("api.main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.get("/goals")
     assert resp.status_code == 200
@@ -128,7 +128,7 @@ def test_get_goals_empty_returns_200_and_empty_list(fake_get_session):
 
 def test_get_goals_returns_newest_first_with_pagination(fake_get_session):
     """GET /goals returns goals newest first; limit and offset work."""
-    with patch("main.get_session", fake_get_session):
+    with patch("api.main.get_session", fake_get_session):
         client = TestClient(app)
         for i in range(3):
             client.post(
@@ -161,7 +161,7 @@ def test_get_goals_returns_newest_first_with_pagination(fake_get_session):
 
 def test_get_goals_invalid_params_return_422(fake_get_session):
     """GET /goals with negative offset or limit returns 422."""
-    with patch("main.get_session", fake_get_session):
+    with patch("api.main.get_session", fake_get_session):
         client = TestClient(app)
         resp = client.get("/goals?offset=-1")
         assert resp.status_code == 422
