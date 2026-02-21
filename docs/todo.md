@@ -1,5 +1,7 @@
 # AI Goal Coach - Project Checklist
 
+This checklist describes the original build phases. The codebase now uses the layout `api/`, `ui/`, `core/`, `goal_coach/` (see [docs/plans/2025-02-20-project-structure-design.md](plans/2025-02-20-project-structure-design.md)). References to `main.py`/`app.py`/`schemas.py` etc. correspond to `api/main.py`, `ui/app.py`, `core/schemas.py` in the current tree.
+
 ## Phase 0: Project Setup & Prerequisites
 - Create a new Git repository for the project.
 - Get a Google Gemini API Key from Google AI Studio.
@@ -8,12 +10,12 @@
 
 ## Phase 1: Data Models & Database Setup
 - **Dependencies:** Create `requirements.txt` and install: `fastapi`, `uvicorn`, `sqlmodel`, `pydantic`, `pytest`, `pytest-asyncio`, `google-genai`, `google-agent-development-kit`.
-- **Schemas (`schemas.py`):**
+- **Schemas (`core/schemas.py`):**
   - Define `GoalModel` inheriting from `pydantic.BaseModel`.
   - Add `refined_goal` (str) with description.
   - Add `key_results` (list) with `min_length=3`, `max_length=5`.
   - Add `confidence_score` (float) with bounds `ge=0.0`, `le=1.0`.
-- **Database (`database.py`):**
+- **Database (`core/database.py`):**
   - Define `Goal` table using `SQLModel` (table=True).
   - Include fields: `id` (UUID, primary_key), `original_input` (str), `refined_goal` (str), `key_results` (str/JSON), `confidence_score` (float), `status` (str, default='draft'), `created_at` (datetime).
   - Implement `get_session()` to yield an SQLite session.
@@ -24,12 +26,12 @@
   - Run `pytest test_database.py` and ensure it passes.
 
 ## Phase 2: Google ADK Agent & Telemetry
-- **Telemetry (`telemetry.py`):**
+- **Telemetry (`core/telemetry.py`):**
   - Create a custom ADK Runner callback/listener class.
   - Implement extraction of execution metrics (latency, token usage).
   - Implement cost calculation function for `gemini-2.5-flash` ($0.075/1M input, $0.30/1M output).
   - Format and print structured JSON log to `stdout` upon run completion.
-- **Agent (`agent.py`):**
+- **Agent (`goal_coach/agent.py`):**
   - Import `LlmAgent` and `Runner` from `google.adk`.
   - Instantiate `LlmAgent` configured with model `gemini-2.5-flash`.
   - Attach `output_schema=GoalModel` to the agent.
@@ -42,7 +44,7 @@
   - Run `pytest test_agent.py` and ensure it passes.
 
 ## Phase 3: FastAPI Backend
-- **API Setup (`main.py`):**
+- **API Setup (`api/main.py`):**
   - Initialize FastAPI app instance.
   - Add CORS middleware if needed for local frontend testing.
 - **Endpoint: `POST /generate`:**
@@ -65,7 +67,7 @@
 
 ## Phase 4: Streamlit Frontend
 - **Frontend Setup:** Add `streamlit` and `requests` to `requirements.txt`.
-- **UI Implementation (`app.py`):**
+- **UI Implementation (`ui/app.py`):**
   - Render Page Title ("AI Goal Coach").
   - Render input text area for the vague goal.
   - Render "Refine Goal" button.
@@ -76,7 +78,7 @@
   - Display `confidence_score` using `st.metric()`.
   - Render "Save Approved Goal" button.
   - On click, send POST request to `http://localhost:8000/goals` and show `st.success()`.
-- **Manual Verification:** Start backend (`uvicorn main:app`) and frontend (`streamlit run app.py`) locally and test the UI flow end-to-step.
+- **Manual Verification:** Start backend (`uv run uvicorn api.main:app --port 8000`) and frontend (`uv run streamlit run ui/app.py --server.port 8501`) from repo root and test the UI flow end-to-end.
 
 ## Phase 5: Live Evaluations
 - **Evaluation Script (`test_evals.py`):**
@@ -86,7 +88,7 @@
   - Add Happy Path Test 2: "Increase team velocity."
   - Add Happy Path Test 3: "Read more books."
   - Add Adversarial Test: "DROP TABLE goals;" (Assert valid JSON schema returned, but `confidence_score < 0.5`).
-- **Run Evaluations:** Execute `pytest test_evals.py -v` to confirm real-world performance against the LLM.
+- **Run Evaluations:** Execute `uv run pytest tests/test_evals.py -m integration -v` from repo root to confirm real-world performance against the LLM.
 
 ## Phase 6: Dockerization
 - **Backend Dockerfile (`Dockerfile.api`):**
