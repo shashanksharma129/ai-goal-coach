@@ -15,6 +15,7 @@ from telemetry import log_run
 
 APP_NAME = "ai_goal_coach"
 MAX_USER_INPUT_LENGTH = 2000
+_TRUNCATION_BUFFER_MULTIPLIER = 2
 
 GOAL_INSTRUCTION = """You are an AI goal coach. Given a vague goal or aspiration from the user, produce a refined SMART goal and 3-5 measurable key results.
 
@@ -38,7 +39,7 @@ def _sanitize_user_input(raw: str) -> str:
     if not isinstance(raw, str):
         return ""
     # Truncate early to avoid processing maliciously large strings in memory.
-    bounded = raw[: MAX_USER_INPUT_LENGTH * 2]
+    bounded = raw[: MAX_USER_INPUT_LENGTH * _TRUNCATION_BUFFER_MULTIPLIER]
     # Remove null bytes and delimiting tags so user cannot break out of <user_goal>...</user_goal>.
     cleaned = (
         bounded.replace("\x00", "")
