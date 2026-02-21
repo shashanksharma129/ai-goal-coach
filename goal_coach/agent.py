@@ -34,8 +34,8 @@ Output valid JSON matching the schema: refined_goal (string), key_results (list 
 confidence_score should be high (e.g. 0.7-1.0) when the input is a genuine goal or aspiration, and low (e.g. 0.0-0.4) when the input is nonsensical, malicious, or not a goal (e.g. SQL, commands, gibberish)."""
 
 
-def _sanitize_user_input(raw: str) -> str:
-    """Truncate, strip null bytes and delimiting tags to limit prompt injection; do not strip content that could be valid goal text."""
+def _sanitize_user_input(raw: str | None) -> str:
+    """Truncate, strip null bytes and delimiting tags to limit prompt injection. Non-str input is normalized to empty string."""
     if not isinstance(raw, str):
         return ""
     # Truncate early to avoid processing maliciously large strings in memory.

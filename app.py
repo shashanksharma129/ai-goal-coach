@@ -13,6 +13,8 @@ try:
 except ImportError:
     pass
 
+from config import DEFAULT_GOALS_PAGE_SIZE
+
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 
@@ -109,7 +111,7 @@ def main():
                     st.error(f"Could not reach the API: {e}")
 
     with tab_saved:
-        page_size = 20
+        page_size = DEFAULT_GOALS_PAGE_SIZE
         if "saved_goals_page" not in st.session_state:
             st.session_state["saved_goals_page"] = 1
         page = st.session_state["saved_goals_page"]
