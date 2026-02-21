@@ -8,7 +8,7 @@ A small system that turns vague aspirations into structured SMART goals using a 
 
 ### Why this AI model (Gemini 2.5 Flash)
 
-- **Speed and cost:** We need one fast, cheap call per goal. Flash gives low latency and low cost per request (see [telemetry](telemetry.py): $0.075/1M input, $0.30/1M output), which is enough for a prototype and moderate traffic.
+- **Speed and cost:** We need one fast, cheap call per goal. Flash gives low latency and low cost per request (see [core/telemetry.py](core/telemetry.py): $0.075/1M input, $0.30/1M output), which is enough for a prototype and moderate traffic.
 - **Single-shot quality:** The task is "refine one goal + 3–5 key results + confidence." We did not need multi-step reasoning or tool use; Flash is sufficient for this scope.
 - **Availability:** Google AI Studio and a single API key (`GEMINI_API_KEY`) keep integration simple; no separate auth or model-hosting infra.
 
@@ -52,12 +52,12 @@ Update this README when any of these are adopted.
 
 ## Architecture overview
 
-- **UI:** [Streamlit](app.py) – two tabs: **Refine** (input → POST `/generate`, view result, POST `/goals` to save) and **Saved goals** (GET `/goals`, list saved goals with pagination).
-- **API:** [FastAPI](main.py) → POST `/generate`, POST `/goals`, GET `/goals` (list, newest first, paginated). Calls [goal_coach](goal_coach/agent.py) (`generate_smart_goal`) and [database](database.py). Returns 400 when confidence &lt; 0.5, 502 on model/schema failure.
-- **Agent:** [goal_coach](goal_coach/agent.py) – Google ADK Agent with `output_schema=GoalModel`, model `gemini-2.5-flash`. [Telemetry](telemetry.py) logs one JSON line per run to stdout.
-- **Storage:** SQLite ([Goal](database.py) table); path via `GOALS_DB_PATH` (default `goals.db`).
+- **UI:** [Streamlit](ui/app.py) – two tabs: **Refine** (input → POST `/generate`, view result, POST `/goals` to save) and **Saved goals** (GET `/goals`, list saved goals with pagination).
+- **API:** [FastAPI](api/main.py) → POST `/generate`, POST `/goals`, GET `/goals` (list, newest first, paginated). Calls [goal_coach](goal_coach/agent.py) (`generate_smart_goal`) and [core/database.py](core/database.py). Returns 400 when confidence &lt; 0.5, 502 on model/schema failure.
+- **Agent:** [goal_coach](goal_coach/agent.py) – Google ADK Agent with `output_schema=GoalModel`, model `gemini-2.5-flash`. [core/telemetry.py](core/telemetry.py) logs one JSON line per run to stdout.
+- **Storage:** SQLite ([Goal](core/database.py) table); path via `GOALS_DB_PATH` (default `goals.db`).
 
-See [spec.md](spec.md) for the full system specification.
+See [docs/spec.md](docs/spec.md) for the full system specification.
 
 ---
 
@@ -88,12 +88,12 @@ See [spec.md](spec.md) for the full system specification.
 
 3. **Start the API** (in one terminal)
    ```bash
-   uv run uvicorn main:app --reload --port 8000
+   uv run uvicorn api.main:app --reload --port 8000
    ```
 
 4. **Start the UI** (in another terminal)
    ```bash
-   uv run streamlit run app.py --server.port 8501
+   uv run streamlit run ui/app.py --server.port 8501
    ```
 
 5. **Use the app**
@@ -153,10 +153,9 @@ The API container needs `GEMINI_API_KEY` to call Gemini. **Never commit the key 
 
 ## Project layout
 
-- `goal_coach/` – Agent package (`__init__.py`, `agent.py` with `root_agent` and `generate_smart_goal`)
-- `app.py` – Streamlit UI
-- `main.py` – FastAPI app and `/generate`, `/goals`
-- `telemetry.py` – Cost and JSON log line per run
-- `schemas.py` – `GoalModel` (Pydantic)
-- `database.py` – `Goal` table and `get_session()`
+- `api/` – FastAPI app (`api/main.py`: `/generate`, `/goals`)
+- `ui/` – Streamlit UI (`ui/app.py`)
+- `core/` – Shared config, database, schemas, telemetry
+- `goal_coach/` – Agent package (`agent.py` with `root_agent` and `generate_smart_goal`)
+- `docs/` – Spec, plans, and other documentation
 - `tests/` – Unit and integration tests
