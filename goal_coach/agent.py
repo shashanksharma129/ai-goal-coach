@@ -3,8 +3,11 @@
 
 import time
 import uuid
+from datetime import date
+
 from google.genai import types
 from google.adk import Agent, Runner
+from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
 from schemas import GoalModel
@@ -26,11 +29,17 @@ Output valid JSON matching the schema: refined_goal (string), key_results (list 
 confidence_score should be high (e.g. 0.7-1.0) when the input is a genuine goal or aspiration, and low (e.g. 0.0-0.4) when the input is nonsensical, malicious, or not a goal (e.g. SQL, commands, gibberish)."""
 
 
+def _goal_instruction_provider(ctx: ReadonlyContext) -> str:
+    """Return the goal coach instruction with the current date so time-bound goals use today."""
+    today = date.today().isoformat()
+    return f"{GOAL_INSTRUCTION}\n\nToday's date is {today}."
+
+
 def _create_agent() -> Agent:
     return Agent(
         model="gemini-2.5-flash",
         name="goal_coach",
-        instruction=GOAL_INSTRUCTION,
+        instruction=_goal_instruction_provider,
         output_schema=GoalModel,
     )
 
