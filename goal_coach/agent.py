@@ -34,13 +34,19 @@ confidence_score should be high (e.g. 0.7-1.0) when the input is a genuine goal 
 
 
 def _sanitize_user_input(raw: str) -> str:
-    """Truncate and strip null bytes to limit prompt injection surface; do not strip content that could be valid goal text."""
+    """Truncate, strip null bytes and delimiting tags to limit prompt injection; do not strip content that could be valid goal text."""
     if not isinstance(raw, str):
         return ""
-    cleaned = raw.replace("\x00", "").strip()
-    if len(cleaned) > MAX_USER_INPUT_LENGTH:
-        return cleaned[:MAX_USER_INPUT_LENGTH]
-    return cleaned
+    # Truncate early to avoid processing maliciously large strings in memory.
+    bounded = raw[: MAX_USER_INPUT_LENGTH * 2]
+    # Remove null bytes and delimiting tags so user cannot break out of <user_goal>...</user_goal>.
+    cleaned = (
+        bounded.replace("\x00", "")
+        .replace("</user_goal>", "")
+        .replace("<user_goal>", "")
+        .strip()
+    )
+    return cleaned[:MAX_USER_INPUT_LENGTH]
 
 
 def _goal_instruction_provider(_ctx: ReadonlyContext) -> str:
