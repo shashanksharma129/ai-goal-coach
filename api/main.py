@@ -1,24 +1,99 @@
 # ABOUTME: FastAPI app: POST /generate (goal refinement), POST /goals (persist), GET /goals (list, paginated).
-# ABOUTME: 400 on low confidence, 502 on agent/schema failure.
+# ABOUTME: 400 on low confidence, 502 on agent/schema failure. Auth via JWT; goals scoped by user.
 
 import json
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
-
-load_dotenv()
+from fastapi import APIRouter, Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import select
 
+load_dotenv()
+
 from goal_coach.agent import generate_smart_goal
-from core.config import DEFAULT_GOALS_PAGE_SIZE, MAX_GOALS_PAGE_SIZE
-from core.database import Goal, get_session
+from core.auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    validate_password_length,
+    validate_username,
+    verify_password,
+)
+from core.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    DEFAULT_GOALS_PAGE_SIZE,
+    MAX_GOALS_PAGE_SIZE,
+)
+from core.database import Goal, User, get_session
 from core.schemas import GoalModel
+
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@auth_router.post("/signup", status_code=201)
+def post_signup(req: SignupRequest):
+    """Create a new user. Returns id and username; client should call login to get a token."""
+    try:
+        validate_username(req.username)
+        validate_password_length(req.password)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"message": str(e)})
+    username_clean = req.username.strip()
+    try:
+        with get_session() as session:
+            user = User(
+                username=username_clean,
+                password_hash=hash_password(req.password),
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            return {"id": str(user.id), "username": user.username}
+    except IntegrityError:
+        return JSONResponse(
+            status_code=409,
+            content={"message": "Username already taken."},
+        )
+    except SQLAlchemyError:
+        logging.exception("post_signup failed (database error)")
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Could not create account."},
+        )
+
+
+@auth_router.post("/login")
+def post_login(req: LoginRequest):
+    """Authenticate and return a JWT."""
+    with get_session() as session:
+        stmt = select(User).where(User.username == req.username.strip())
+        user = session.exec(stmt).first()
+    if user is None or not verify_password(req.password, user.password_hash):
+        return JSONResponse(
+            status_code=401,
+            content={"message": "Invalid username or password."},
+        )
+    access_token = create_access_token(user.id)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    }
 
 
 def _goal_to_json(goal: Goal) -> dict:
@@ -35,6 +110,7 @@ def _goal_to_json(goal: Goal) -> dict:
 
 
 app = FastAPI(title="AI Goal Coach API")
+app.include_router(auth_router)
 # allow_origins=["*"] is for prototype/dev only; set explicit origins before production.
 app.add_middleware(
     CORSMiddleware,
@@ -58,8 +134,8 @@ class GoalCreateRequest(BaseModel):
 
 
 @app.post("/generate", response_model=GoalModel)
-def post_generate(req: GenerateRequest):
-    """Generate a refined SMART goal from vague user input."""
+def post_generate(req: GenerateRequest, _user: User = Depends(get_current_user)):
+    """Generate a refined SMART goal from vague user input. Requires authentication."""
     try:
         result = generate_smart_goal(req.user_input)
     except Exception:
@@ -77,11 +153,12 @@ def post_generate(req: GenerateRequest):
 
 
 @app.post("/goals")
-def post_goals(req: GoalCreateRequest):
-    """Persist an approved goal to the database."""
+def post_goals(req: GoalCreateRequest, current_user: User = Depends(get_current_user)):
+    """Persist an approved goal to the database. Goal is scoped to the authenticated user."""
     try:
         with get_session() as session:
             goal = Goal(
+                user_id=current_user.id,
                 original_input=req.original_input,
                 refined_goal=req.refined_goal,
                 key_results=json.dumps(req.key_results),
@@ -107,12 +184,23 @@ def post_goals(req: GoalCreateRequest):
 
 
 @app.get("/goals")
-def get_goals(limit: int = Query(DEFAULT_GOALS_PAGE_SIZE, ge=0, le=MAX_GOALS_PAGE_SIZE), offset: int = Query(0, ge=0)):
-    """List saved goals, newest first. Returns { goals: [...], total: N }."""
+def get_goals(
+    limit: int = Query(DEFAULT_GOALS_PAGE_SIZE, ge=0, le=MAX_GOALS_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """List saved goals for the authenticated user, newest first. Returns { goals: [...], total: N }."""
     try:
         with get_session() as session:
-            total = session.exec(select(func.count()).select_from(Goal)).one()
-            stmt = select(Goal).order_by(Goal.created_at.desc()).limit(limit).offset(offset)
+            total_stmt = select(func.count()).select_from(Goal).where(Goal.user_id == current_user.id)
+            total = session.exec(total_stmt).one()
+            stmt = (
+                select(Goal)
+                .where(Goal.user_id == current_user.id)
+                .order_by(Goal.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
             goals = list(session.exec(stmt))
         return {"goals": [_goal_to_json(g) for g in goals], "total": total}
     except SQLAlchemyError:

@@ -1,5 +1,5 @@
-# ABOUTME: Streamlit UI: Refine tab (generate + save) and Saved goals tab (GET /goals list with pagination).
-# ABOUTME: API URL configurable via API_URL env (default http://localhost:8000).
+# ABOUTME: Streamlit UI: Login/signup, then Refine tab (generate + save) and Saved goals tab (GET /goals).
+# ABOUTME: API URL configurable via API_URL env; JWT stored in session_state, sent as Bearer on requests.
 
 import os
 from datetime import datetime
@@ -16,6 +16,7 @@ except ImportError:
 from core.config import DEFAULT_GOALS_PAGE_SIZE
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
+SESSION_ACCESS_TOKEN = "access_token"
 
 
 def _safe_json(response: requests.Response):
@@ -26,7 +27,107 @@ def _safe_json(response: requests.Response):
         return {}
 
 
+def _auth_headers():
+    """Return headers with Bearer token for authenticated API calls, or empty dict if not logged in."""
+    token = st.session_state.get(SESSION_ACCESS_TOKEN)
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _clear_auth_and_rerun():
+    """Remove token from session and rerun to show login screen."""
+    if SESSION_ACCESS_TOKEN in st.session_state:
+        del st.session_state[SESSION_ACCESS_TOKEN]
+    st.rerun()
+
+
+def _render_login_signup():
+    """Show Login and Sign up tabs; on success set access_token and rerun."""
+    st.title("AI Goal Coach")
+    st.write("Sign in or create an account to continue.")
+
+    tab_login, tab_signup = st.tabs(["Login", "Sign up"])
+
+    with tab_login:
+        with st.form("login_form"):
+            login_username = st.text_input("Username", key="login_username")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            if st.form_submit_button("Sign in"):
+                if not (login_username and login_username.strip() and login_password):
+                    st.error("Enter username and password.")
+                else:
+                    try:
+                        r = requests.post(
+                            f"{API_URL}/auth/login",
+                            json={"username": login_username.strip(), "password": login_password},
+                            timeout=10,
+                        )
+                        if r.status_code == 200:
+                            data = _safe_json(r)
+                            token = data.get("access_token")
+                            if token:
+                                st.session_state[SESSION_ACCESS_TOKEN] = token
+                                st.rerun()
+                            else:
+                                st.error("Invalid response from server.")
+                        else:
+                            body = _safe_json(r)
+                            st.error(body.get("message", "Invalid username or password."))
+                    except requests.RequestException as e:
+                        st.error(f"Could not reach the API: {e}")
+
+    with tab_signup:
+        with st.form("signup_form"):
+            signup_username = st.text_input("Username", key="signup_username")
+            signup_password = st.text_input("Password", type="password", key="signup_password")
+            if st.form_submit_button("Create account"):
+                if not (signup_username and signup_username.strip() and signup_password):
+                    st.error("Enter username and password.")
+                else:
+                    try:
+                        r = requests.post(
+                            f"{API_URL}/auth/signup",
+                            json={"username": signup_username.strip(), "password": signup_password},
+                            timeout=10,
+                        )
+                        if r.status_code == 201:
+                            login_r = requests.post(
+                                f"{API_URL}/auth/login",
+                                json={"username": signup_username.strip(), "password": signup_password},
+                                timeout=10,
+                            )
+                            if login_r.status_code == 200:
+                                data = _safe_json(login_r)
+                                token = data.get("access_token")
+                                if token:
+                                    st.session_state[SESSION_ACCESS_TOKEN] = token
+                                    st.rerun()
+                                else:
+                                    st.error("Account created. Please sign in on the Login tab.")
+                            else:
+                                st.success("Account created. Please sign in on the Login tab.")
+                        elif r.status_code == 409:
+                            st.error("Username already taken.")
+                        elif r.status_code == 400:
+                            body = _safe_json(r)
+                            st.error(body.get("message", "Invalid input."))
+                        else:
+                            body = _safe_json(r)
+                            st.error(body.get("message", "Sign up failed."))
+                    except requests.RequestException as e:
+                        st.error(f"Could not reach the API: {e}")
+
+
 def main():
+    if not st.session_state.get(SESSION_ACCESS_TOKEN):
+        _render_login_signup()
+        return
+
+    if st.sidebar.button("Logout"):
+        _clear_auth_and_rerun()
+        return
+
     st.title("AI Goal Coach")
     st.write("Enter a vague goal or aspiration below and refine it into a SMART goal.")
 
@@ -48,6 +149,7 @@ def main():
                         r = requests.post(
                             f"{API_URL}/generate",
                             json={"user_input": user_input.strip()},
+                            headers=_auth_headers(),
                             timeout=60,
                         )
                         if r.status_code == 200:
@@ -57,6 +159,9 @@ def main():
                                 return
                             st.session_state["last_goal"] = data
                             st.session_state["last_original_input"] = user_input.strip()
+                        elif r.status_code == 401:
+                            _clear_auth_and_rerun()
+                            return
                         elif r.status_code == 400:
                             body = _safe_json(r)
                             msg = body.get("message", r.text or "Input too vague or invalid.")
@@ -95,6 +200,7 @@ def main():
                             "confidence_score": goal["confidence_score"],
                             "status": "saved",
                         },
+                        headers=_auth_headers(),
                         timeout=10,
                     )
                     if r.status_code == 200:
@@ -103,6 +209,9 @@ def main():
                             if key in st.session_state:
                                 del st.session_state[key]
                         st.rerun()
+                    elif r.status_code == 401:
+                        _clear_auth_and_rerun()
+                        return
                     else:
                         body = _safe_json(r)
                         msg = body.get("message", r.text or "Save failed.")
@@ -121,10 +230,14 @@ def main():
             r = requests.get(
                 f"{API_URL}/goals",
                 params={"limit": page_size, "offset": offset},
+                headers=_auth_headers(),
                 timeout=10,
             )
         except requests.RequestException as e:
             st.error(f"Could not load saved goals. Try again. Error: {e}")
+            return
+        if r.status_code == 401:
+            _clear_auth_and_rerun()
             return
         if r.status_code != 200:
             body = _safe_json(r)
