@@ -1,5 +1,5 @@
 
-
+This document is a historical blueprint for code-generation prompts. The repository now uses the layout `api/`, `ui/`, `core/`, `goal_coach/` (see docs/plans/); references to `main.py` and `app.py` correspond to `api/main.py` and `ui/app.py`.
 
 Here is the detailed blueprint, the iterative breakdown process, and the final sequence of prompts to feed into a code-generation LLM. 
 

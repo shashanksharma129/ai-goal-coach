@@ -40,7 +40,7 @@ The AI Goal Coach is a lightweight, containerized system that refines vague empl
 
 To avoid the overhead of PostgreSQL and Alembic in a prototype, we are using a simple SQLite database with standard SQL queries or a lightweight ORM (like SQLModel).
 
-**SQLite Table: `goals**`
+**SQLite Table: `goals`**
 
 * `id` (UUID, Primary Key)
 * `original_input` (TEXT)
@@ -83,8 +83,7 @@ class GoalModel(BaseModel):
 
 The system must log the inputs, outputs, latency, and token cost of every AI request without cluttering the core business logic.
 
-* **OTel Integration:** We will use ADK's built-in OpenTelemetry hooks to trace the agent's execution span.
-* **Custom Logging Callback:** We will attach a telemetry listener to the ADK `Runner`. On completion of the `LlmAgent` run, this listener will extract the metadata and print a structured JSON log to `stdout`.
+* **Custom Logging Callback:** A telemetry callback is attached to the ADK `Runner`. On completion of each `LlmAgent` run, it extracts metadata (latency, token counts, confidence) and prints a single structured JSON line to `stdout` (see `core/telemetry.py`). No separate OTel backend is required for the prototype.
 * **Cost Calculation:** The logger will calculate estimated cost based on Gemini 2.5 Flash API pricing:
 * `Estimated Cost = (prompt_tokens * $PricePerToken) + (completion_tokens * $PricePerToken)`
 
@@ -95,7 +94,7 @@ The system must log the inputs, outputs, latency, and token cost of every AI req
 
 ## 6. Testing & Evaluation Plan
 
-The evaluation script (`test_evals.py`) acts as our CI gate to ensure model/prompt changes do not break the system.
+The evaluation script (`tests/test_evals.py`) acts as our CI gate to ensure model/prompt changes do not break the system.
 
 **Mini-Eval Setup:**
 We will use ADK's native testing/evaluation capabilities (or a simple pytest script) to pass predefined inputs to the `LlmAgent` and assert the structural integrity of the output.
