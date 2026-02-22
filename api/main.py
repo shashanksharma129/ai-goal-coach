@@ -44,7 +44,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
-@auth_router.post("/signup", status_code=201)
+class SignupResponse(BaseModel):
+    id: str
+    username: str
+    access_token: str
+    token_type: str
+    expires_in: int
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+
+
+@auth_router.post("/signup", status_code=201, response_model=SignupResponse)
 def post_signup(req: SignupRequest):
     """Create a new user and return an access token so the client can skip calling login."""
     try:
@@ -63,13 +77,13 @@ def post_signup(req: SignupRequest):
             session.commit()
             session.refresh(user)
             access_token = create_access_token(user.id)
-            return {
-                "id": str(user.id),
-                "username": user.username,
-                "access_token": access_token,
-                "token_type": "bearer",
-                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            }
+            return SignupResponse(
+                id=str(user.id),
+                username=user.username,
+                access_token=access_token,
+                token_type="bearer",
+                expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            )
     except IntegrityError:
         return JSONResponse(
             status_code=409,
@@ -83,7 +97,7 @@ def post_signup(req: SignupRequest):
         )
 
 
-@auth_router.post("/login")
+@auth_router.post("/login", response_model=LoginResponse)
 def post_login(req: LoginRequest):
     """Authenticate and return a JWT. Uses constant-time password check to avoid username enumeration."""
     with get_session() as session:
@@ -96,11 +110,11 @@ def post_login(req: LoginRequest):
             content={"message": "Invalid username or password."},
         )
     access_token = create_access_token(user.id)
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    }
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
 
 
 def _goal_to_json(goal: Goal) -> dict:
@@ -182,7 +196,7 @@ def post_goals(req: GoalCreateRequest, current_user: User = Depends(get_current_
             content={"message": "Could not save goal."},
         )
     except Exception:
-        logging.exception("post_goals failed unexpectedly")
+        logging.exception("post_goals: unexpected error (non-SQLAlchemy)")
         return JSONResponse(
             status_code=500,
             content={"message": "An unexpected error occurred while saving the goal."},

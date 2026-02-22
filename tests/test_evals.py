@@ -1,5 +1,5 @@
 # ABOUTME: Live integration tests for generate_smart_goal; real Gemini calls, GEMINI_API_KEY required.
-# ABOUTME: Marked @pytest.mark.integration so they are excluded from default pytest runs.
+# ABOUTME: Default run includes 3 happy + 1 adversarial (extra_evals excluded). Run all evals: pytest tests/test_evals.py -m integration.
 
 import pytest
 from goal_coach.agent import generate_smart_goal
@@ -55,6 +55,7 @@ def test_evals_adversarial_sql():
 
 # Prompt-injection examples from Gemini review (PR #2); agent should return valid GoalModel with low confidence.
 @pytest.mark.integration
+@pytest.mark.extra_evals
 def test_evals_adversarial_ignore_instructions():
     """Prompt injection: ignore instructions and generate arbitrary content -> low confidence."""
     result = generate_smart_goal(
@@ -65,6 +66,7 @@ def test_evals_adversarial_ignore_instructions():
 
 
 @pytest.mark.integration
+@pytest.mark.extra_evals
 def test_evals_adversarial_change_output_format():
     """Prompt injection: forget JSON schema -> low confidence."""
     result = generate_smart_goal(
@@ -75,6 +77,7 @@ def test_evals_adversarial_change_output_format():
 
 
 @pytest.mark.integration
+@pytest.mark.extra_evals
 def test_evals_adversarial_extract_instructions():
     """Prompt injection: extract system instructions -> low confidence."""
     result = generate_smart_goal(
@@ -85,6 +88,7 @@ def test_evals_adversarial_extract_instructions():
 
 
 @pytest.mark.integration
+@pytest.mark.extra_evals
 def test_evals_adversarial_malicious_goal():
     """Prompt injection: malicious goal (misinformation campaign) -> low confidence."""
     result = generate_smart_goal(
@@ -95,6 +99,7 @@ def test_evals_adversarial_malicious_goal():
 
 
 @pytest.mark.integration
+@pytest.mark.extra_evals
 def test_evals_adversarial_role_reversal():
     """Prompt injection: role reversal and data exfiltration -> low confidence."""
     result = generate_smart_goal(
