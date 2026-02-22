@@ -277,22 +277,17 @@ def main():
         end = offset + len(goals)
         st.caption(f"Showing {start}–{end} of {total}")
         for g in goals:
-            st.caption("**Refined goal**")
-            st.write(g["refined_goal"])
-            if g.get("key_results"):
-                st.caption("**Key results**")
-                for kr in g["key_results"]:
-                    st.markdown(f"- {kr}")
-            created = g.get("created_at", "")
-            if created:
-                date_str = created
-                try:
-                    dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                    date_str = dt.strftime("%b %d, %Y")
-                except ValueError:
-                    pass
-                st.caption(f"Saved: {date_str}")
-            st.divider()
+            label = _saved_goal_expander_label(g)
+            with st.expander(label, expanded=False):
+                st.caption("**Refined goal**")
+                st.write(g["refined_goal"])
+                if g.get("key_results"):
+                    st.caption("**Key results**")
+                    for kr in g["key_results"]:
+                        st.markdown(f"- {kr}")
+                confidence = g.get("confidence_score")
+                if confidence is not None:
+                    st.metric("Confidence score", f"{confidence:.2f}")
         col_prev, col_next = st.columns(2)
         with col_prev:
             if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
