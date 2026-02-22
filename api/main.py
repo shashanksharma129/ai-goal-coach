@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
