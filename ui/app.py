@@ -223,6 +223,10 @@ def main():
 
         if "last_goal" in st.session_state:
             goal = st.session_state["last_goal"]
+            feedback_key = "refine_further_feedback"
+            if st.session_state.pop("clear_refine_feedback", None):
+                st.session_state[feedback_key] = ""
+                st.rerun()
             with st.container(border=True):
                 st.subheader("Refined goal")
                 st.write(goal["refined_goal"])
@@ -237,7 +241,6 @@ def main():
                 st.caption(
                     "Ask for changes—tone, deadline, constraints—and get an updated goal."
                 )
-                feedback_key = "refine_further_feedback"
                 feedback = st.text_area(
                     "Your feedback",
                     placeholder="e.g. Make the deadline 6 months, or add a key result about finishing 2 books.",
@@ -273,7 +276,7 @@ def main():
                                         st.session_state["goal_session_id"] = data[
                                             "session_id"
                                         ]
-                                    st.session_state[feedback_key] = ""
+                                    st.session_state["clear_refine_feedback"] = True
                                     st.rerun()
                                 else:
                                     st.error(
