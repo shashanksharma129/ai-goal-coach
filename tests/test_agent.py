@@ -12,7 +12,6 @@ from goal_coach.agent import (
     MAX_USER_INPUT_LENGTH,
 )
 
-# user_id for session isolation in tests (matches ADK session identity).
 _TEST_USER_ID = "test-user"
 
 
@@ -99,7 +98,7 @@ def test_generate_smart_goal_sends_wrapped_user_input_to_runner(mock_runner):
     mock_runner.run.assert_called_once()
     call_kw = mock_runner.run.call_args.kwargs
     assert call_kw["user_id"] == _TEST_USER_ID
-    assert call_kw["session_id"]  # new uuid string
+    assert call_kw["session_id"]
     new_message = call_kw["new_message"]
     assert new_message.parts
     text = new_message.parts[0].text

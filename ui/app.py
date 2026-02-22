@@ -21,7 +21,6 @@ SESSION_ACCESS_TOKEN = "access_token"
 SAVED_GOAL_SUMMARY_MAX_CHARS = 80
 
 
-# Label for saved-goal expander: "Created on MMM DD, YYYY" so the date is clearly creation date.
 _SAVED_GOAL_DATE_PREFIX = "Created on "
 
 

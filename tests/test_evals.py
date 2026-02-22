@@ -1,12 +1,10 @@
 # ABOUTME: Live integration tests for generate_smart_goal; real Gemini calls, GEMINI_API_KEY required.
 # ABOUTME: Default run includes 3 happy + 1 adversarial (extra_evals excluded). Run all evals: pytest tests/test_evals.py -m integration.
-# ABOUTME: Adversarial cases (extra_evals) verify robustness against prompt injection.
 
 import pytest
 from goal_coach.agent import generate_smart_goal
 from core.schemas import GoalModel
 
-# user_id for evals (no auth in integration tests).
 _EVALS_USER_ID = "evals-user"
 
 
