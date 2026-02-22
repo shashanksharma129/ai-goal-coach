@@ -30,7 +30,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = '-m "not extra_evals"'
 markers = [
     "integration: live tests that call Gemini (require GEMINI_API_KEY); exclude with -m 'not integration'",
     "extra_evals: eval tests not in default subset; run with -m extra_evals or -m \"\" to include",
