@@ -17,6 +17,26 @@ from core.config import DEFAULT_GOALS_PAGE_SIZE
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 SESSION_ACCESS_TOKEN = "access_token"
+SAVED_GOAL_SUMMARY_MAX_CHARS = 80
+
+
+def _saved_goal_expander_label(goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_MAX_CHARS) -> str:
+    """Build expander label: truncated refined_goal + date + confidence."""
+    text = (goal.get("refined_goal") or "").strip()
+    summary = (text[:max_chars] + "…") if len(text) > max_chars else text
+    date_str = ""
+    if goal.get("created_at"):
+        try:
+            dt = datetime.fromisoformat(goal["created_at"].replace("Z", "+00:00"))
+            date_str = dt.strftime("%b %d, %Y")
+        except (ValueError, TypeError):
+            raw = goal.get("created_at", "")
+            date_str = raw[:10] if len(raw) >= 10 else ""
+    confidence = goal.get("confidence_score")
+    conf_str = f"{confidence:.2f}" if confidence is not None else "—"
+    if date_str:
+        return f"{summary} • {date_str} • {conf_str}"
+    return f"{summary} • {conf_str}"
 
 
 def _safe_json(response: requests.Response):
