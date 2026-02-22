@@ -164,7 +164,9 @@ class GoalCreateRequest(BaseModel):
 def post_generate(req: GenerateRequest, _user: User = Depends(get_current_user)):
     """Generate a refined SMART goal from vague user input. Optional session_id for iterative refinement. Requires authentication."""
     try:
-        result, session_id = generate_smart_goal(req.user_input, req.session_id)
+        result, session_id = generate_smart_goal(
+            str(_user.id), req.user_input, req.session_id
+        )
     except Exception:
         logging.exception("generate_smart_goal failed")
         return JSONResponse(

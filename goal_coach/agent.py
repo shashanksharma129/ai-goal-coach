@@ -71,18 +71,18 @@ _runner = Runner(
 
 
 def generate_smart_goal(
-    user_input: str, session_id: str | None = None
+    user_id: str, user_input: str, session_id: str | None = None
 ) -> tuple[GoalModel, str]:
     """Run the goal coach agent and return (GoalModel, session_id). Logs telemetry JSON to stdout.
-    If session_id is None, starts a new thread (Role A); otherwise appends to that thread (Role B)."""
+    user_id isolates session history per user (ADK session identity). If session_id is missing or
+    empty, starts a new thread (Role A); otherwise appends to that thread (Role B)."""
     sanitized = _sanitize_user_input(user_input)
-    if session_id is None:
+    if not session_id:
         session_id = str(uuid.uuid4())
         wrapped = f"<user_goal>\n{sanitized}\n</user_goal>"
     else:
         wrapped = f"<user_feedback>\n{sanitized}\n</user_feedback>"
     content = types.Content(role="user", parts=[types.Part(text=wrapped)])
-    user_id = "user"
 
     start = time.perf_counter()
     prompt_tokens = 0

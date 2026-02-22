@@ -4,13 +4,16 @@
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+from core.schemas import GoalModel
 from goal_coach.agent import (
     _goal_instruction_provider,
     _sanitize_user_input,
     generate_smart_goal,
     MAX_USER_INPUT_LENGTH,
 )
-from core.schemas import GoalModel
+
+# user_id for session isolation in tests (matches ADK session identity).
+_TEST_USER_ID = "test-user"
 
 
 def test_sanitize_user_input_strips_null_bytes():
@@ -91,10 +94,11 @@ def test_generate_smart_goal_sends_wrapped_user_input_to_runner(mock_runner):
     goal_json = """{"refined_goal": "Run a marathon.", "key_results": ["A", "B", "C"], "confidence_score": 0.8}"""
     mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
 
-    result, session_id = generate_smart_goal("Run a marathon.")
+    result, session_id = generate_smart_goal(_TEST_USER_ID, "Run a marathon.")
 
     mock_runner.run.assert_called_once()
     call_kw = mock_runner.run.call_args.kwargs
+    assert call_kw["user_id"] == _TEST_USER_ID
     assert call_kw["session_id"]  # new uuid string
     new_message = call_kw["new_message"]
     assert new_message.parts
@@ -112,7 +116,9 @@ def test_generate_smart_goal_returns_valid_goal_model(mock_runner):
     goal_json = """{"refined_goal": "Improve public speaking.", "key_results": ["Speak monthly", "Join Toastmasters", "Practice weekly"], "confidence_score": 0.85}"""
     mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
 
-    result, session_id = generate_smart_goal("I want to get better at speaking.")
+    result, session_id = generate_smart_goal(
+        _TEST_USER_ID, "I want to get better at speaking."
+    )
 
     assert isinstance(result, GoalModel)
     assert result.refined_goal == "Improve public speaking."
@@ -128,7 +134,7 @@ def test_telemetry_callback_invoked_on_success(mock_runner, mock_log_run):
     goal_json = """{"refined_goal": "Read more.", "key_results": ["A", "B", "C"], "confidence_score": 0.7}"""
     mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
 
-    generate_smart_goal("Read more books.")
+    generate_smart_goal(_TEST_USER_ID, "Read more books.")
 
     mock_log_run.assert_called_once()
     call_kw = mock_log_run.call_args.kwargs
@@ -140,17 +146,34 @@ def test_telemetry_callback_invoked_on_success(mock_runner, mock_log_run):
 
 
 @patch("goal_coach.agent._runner")
+def test_generate_smart_goal_empty_session_id_treated_as_new_session(mock_runner):
+    """Empty string session_id is treated as new session (user_goal wrap), not follow-up."""
+    goal_json = """{"refined_goal": "A goal.", "key_results": ["A", "B", "C"], "confidence_score": 0.8}"""
+    mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
+
+    result, session_id = generate_smart_goal(_TEST_USER_ID, "New goal.", session_id="")
+
+    call_kw = mock_runner.run.call_args.kwargs
+    assert call_kw["user_id"] == _TEST_USER_ID
+    assert session_id  # new uuid
+    text = call_kw["new_message"].parts[0].text
+    assert "<user_goal>" in text
+    assert "<user_feedback>" not in text
+
+
+@patch("goal_coach.agent._runner")
 def test_generate_smart_goal_with_session_id_sends_user_feedback(mock_runner):
     """When session_id is provided, message is wrapped in <user_feedback> and same session_id is returned."""
     goal_json = """{"refined_goal": "Updated goal.", "key_results": ["A", "B", "C"], "confidence_score": 0.9}"""
     mock_runner.run.return_value = iter([_event_with_final_content(goal_json)])
 
     result, session_id = generate_smart_goal(
-        "Make the deadline 6 months.", session_id="sess-123"
+        _TEST_USER_ID, "Make the deadline 6 months.", session_id="sess-123"
     )
 
     mock_runner.run.assert_called_once()
     call_kw = mock_runner.run.call_args.kwargs
+    assert call_kw["user_id"] == _TEST_USER_ID
     assert call_kw["session_id"] == "sess-123"
     text = call_kw["new_message"].parts[0].text
     assert "<user_feedback>" in text

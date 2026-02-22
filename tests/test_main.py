@@ -2,7 +2,7 @@
 # ABOUTME: Tests auth signup/login, 401 when unauthenticated, and goal persistence scoped by user.
 
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -264,7 +264,9 @@ def test_generate_with_session_id_calls_agent_and_returns_session_id(
     data = resp.json()
     assert data["session_id"] == "sess-456"
     assert data["refined_goal"] == "Updated goal."
-    mock_generate.assert_called_once_with("Make the deadline 6 months.", "sess-456")
+    mock_generate.assert_called_once_with(
+        ANY, "Make the deadline 6 months.", "sess-456"
+    )
 
 
 def test_post_goals_persists(fake_get_session, in_memory_engine, auth_headers):

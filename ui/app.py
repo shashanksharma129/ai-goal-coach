@@ -274,6 +274,7 @@ def main():
                                         st.session_state["goal_session_id"] = data[
                                             "session_id"
                                         ]
+                                    st.session_state[feedback_key] = ""
                                     st.rerun()
                                 else:
                                     st.error(

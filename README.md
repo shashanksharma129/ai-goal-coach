@@ -32,7 +32,7 @@ We chose schema-bound so the API contract is enforceable and we avoid silent cor
 | Choice | Benefit | Sacrifice |
 |--------|---------|-----------|
 | Gemini Flash (not Pro) | Low latency, low cost | Weaker on edge/adversarial cases |
-| Single agent, one call | Simple flow, no chain latency | No “refine again” or validator agent |
+| Single agent, iterative refinement | Simple flow; "Refine further" reuses same session | No separate validator agent |
 | SQLite | No DB server, easy local/Docker | No high write concurrency |
 | Telemetry to stdout | No extra backends | Dashboards need a log pipeline |
 | JWT auth, goals per user | Multi-tenant isolation | Token/session handling in UI |
@@ -60,7 +60,7 @@ Update this README when any of these are adopted.
 
 - **Sign up:** POST `/auth/signup` with `{"username": "your_user", "password": "your_password"}` → 201. Response includes `access_token`; passwords hashed ([core/auth.py](core/auth.py)), never stored plain.
 - **Login:** POST `/auth/login` with `{"username": "your_user", "password": "your_password"}` → `{"access_token": "...", "token_type": "bearer", "expires_in": N}`. UI sends `Authorization: Bearer <token>` on `/generate` and `/goals`.
-- **Isolation:** Goals stored with `user_id`; GET/POST `/goals` only touch the authenticated user’s data.
+- **Isolation:** Goals stored with `user_id`; GET/POST `/goals` only touch the authenticated user's data. The `/generate` endpoint passes the authenticated user's id to the agent so ADK session history is isolated per user (no cross-user session access).
 
 UI: Login / Sign up when unauthenticated; after login, Refine and Saved goals tabs; Logout in sidebar.
 
@@ -70,7 +70,7 @@ UI: Login / Sign up when unauthenticated; after login, Refine and Saved goals ta
 
 - **UI** ([ui/app.py](ui/app.py)): Login/Sign up → Refine (POST `/generate`, then optionally "Refine further" with feedback in the same thread, then POST `/goals` to save) and Saved goals (GET `/goals`, paginated).
 - **API** ([api/main.py](api/main.py)): `/auth/signup`, `/auth/login`; `/generate` (optional `session_id` for iterative refinement; response includes `session_id`, `refined_goal`, `key_results`, `confidence_score`); `/goals` (JWT required, goals scoped by user). 400 low confidence/bad input, 401 unauthenticated, 502 model/schema failure.
-- **Agent** ([goal_coach/agent.py](goal_coach/agent.py)): ADK agent with session state: first message in a thread produces an initial SMART goal (Role A); follow-up messages in the same session apply feedback and return an updated goal (Role B). `output_schema=GoalModel`, `gemini-2.5-flash`. [core/telemetry.py](core/telemetry.py) logs one JSON line per run.
+- **Agent** ([goal_coach/agent.py](goal_coach/agent.py)): ADK agent with session state keyed by authenticated `user_id` for per-user isolation. First message in a thread produces an initial SMART goal (Role A); follow-up messages in the same session apply feedback and return an updated goal (Role B). Empty or missing `session_id` starts a new thread. `output_schema=GoalModel`, `gemini-2.5-flash`. [core/telemetry.py](core/telemetry.py) logs one JSON line per run.
 - **Storage** ([core/database.py](core/database.py)): SQLite, `users` + `goals` (with `user_id`); `GOALS_DB_PATH` (default `goals.db`).
 
 Code: `ABOUTME` at top of modules, docstrings on public APIs, unit and integration tests. See [docs/spec.md](docs/spec.md) for full spec.
