@@ -1,6 +1,6 @@
 # ABOUTME: Runs API and Streamlit UI; API_URL and GEMINI_API_KEY for UI and API.
 # ABOUTME: Volume persists SQLite at ./data (GOALS_DB_PATH).
-# Set GEMINI_API_KEY and SECRET_KEY in the host environment (or in .env). Compose passes them into the API container.
+# Set GEMINI_API_KEY and SECRET_KEY in the host environment (or in .env). Compose passes them into the API container only; the UI does not need SECRET_KEY.
 
 services:
   api:
