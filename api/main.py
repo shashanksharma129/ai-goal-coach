@@ -16,12 +16,14 @@ from core.auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    DUMMY_PASSWORD_HASH,
     validate_password_length,
     validate_username,
     verify_password,
 )
 from core.config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
+    CORS_ORIGINS,
     DEFAULT_GOALS_PAGE_SIZE,
     MAX_GOALS_PAGE_SIZE,
 )
@@ -44,7 +46,7 @@ class LoginRequest(BaseModel):
 
 @auth_router.post("/signup", status_code=201)
 def post_signup(req: SignupRequest):
-    """Create a new user. Returns id and username; client should call login to get a token."""
+    """Create a new user and return an access token so the client can skip calling login."""
     try:
         validate_username(req.username)
         validate_password_length(req.password)
@@ -60,7 +62,14 @@ def post_signup(req: SignupRequest):
             session.add(user)
             session.commit()
             session.refresh(user)
-            return {"id": str(user.id), "username": user.username}
+            access_token = create_access_token(user.id)
+            return {
+                "id": str(user.id),
+                "username": user.username,
+                "access_token": access_token,
+                "token_type": "bearer",
+                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            }
     except IntegrityError:
         return JSONResponse(
             status_code=409,
@@ -76,11 +85,12 @@ def post_signup(req: SignupRequest):
 
 @auth_router.post("/login")
 def post_login(req: LoginRequest):
-    """Authenticate and return a JWT."""
+    """Authenticate and return a JWT. Uses constant-time password check to avoid username enumeration."""
     with get_session() as session:
         stmt = select(User).where(User.username == req.username.strip())
         user = session.exec(stmt).first()
-    if user is None or not verify_password(req.password, user.password_hash):
+    password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
+    if not verify_password(req.password, password_hash) or user is None:
         return JSONResponse(
             status_code=401,
             content={"message": "Invalid username or password."},
@@ -108,10 +118,9 @@ def _goal_to_json(goal: Goal) -> dict:
 
 app = FastAPI(title="AI Goal Coach API")
 app.include_router(auth_router)
-# allow_origins=["*"] is for prototype/dev only; set explicit origins before production.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

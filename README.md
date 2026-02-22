@@ -58,8 +58,8 @@ Update this README when any of these are adopted.
 
 ## Authentication and multi-tenancy
 
-- **Sign up:** POST `/auth/signup` with `{"username", "password"}` → 201. Passwords hashed ([core/auth.py](core/auth.py)), never stored plain.
-- **Login:** POST `/auth/login` → `{"access_token", "token_type": "bearer"}`. UI sends `Authorization: Bearer <token>` on `/generate` and `/goals`.
+- **Sign up:** POST `/auth/signup` with `{"username": "your_user", "password": "your_password"}` → 201. Response includes `access_token`; passwords hashed ([core/auth.py](core/auth.py)), never stored plain.
+- **Login:** POST `/auth/login` with `{"username": "your_user", "password": "your_password"}` → `{"access_token": "...", "token_type": "bearer", "expires_in": N}`. UI sends `Authorization: Bearer <token>` on `/generate` and `/goals`.
 - **Isolation:** Goals stored with `user_id`; GET/POST `/goals` only touch the authenticated user’s data.
 
 UI: Login / Sign up when unauthenticated; after login, Refine and Saved goals tabs; Logout in sidebar.
@@ -89,7 +89,7 @@ Code: `ABOUTME` at top of modules, docstrings on public APIs, unit and integrati
    cd ai-goal-coach
    uv sync
    ```
-   Add a `.env` in the project root (in `.gitignore`): `GEMINI_API_KEY=your_key_here`
+   Add a `.env` in the project root (in `.gitignore`): `GEMINI_API_KEY=your_key_here` and `SECRET_KEY=your-secret` (required for JWT; use a long random string). Optional: `CORS_ORIGINS=http://localhost:8501` (default) or comma-separated origins for production.
 
 2. Start API: `uv run uvicorn api.main:app --reload --port 8000`
 

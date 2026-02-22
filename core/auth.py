@@ -24,6 +24,10 @@ _http_bearer = HTTPBearer(auto_error=False)
 # bcrypt truncates passwords at 72 bytes; we hash utf-8 bytes.
 _BCRYPT_MAX_PASSWORD_BYTES = 72
 
+# Pre-computed bcrypt hash for a constant string; used when user is None so login
+# always runs verify_password (constant-time, prevents username enumeration).
+DUMMY_PASSWORD_HASH = "$2b$12$DbmI/yRDB5j9Q8I7R9cb5.9jZPh/c32i4pA35t4vTf2jdq32n.L.S"
+
 
 def hash_password(plain: str) -> str:
     """Return a bcrypt hash of the plain-text password (UTF-8, truncated at 72 bytes)."""

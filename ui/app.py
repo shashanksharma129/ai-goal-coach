@@ -127,25 +127,26 @@ def _render_login_signup():
                             timeout=10,
                         )
                         if r.status_code == 201:
-                            login_r = requests.post(
-                                f"{API_URL}/auth/login",
-                                json={
-                                    "username": signup_username.strip(),
-                                    "password": signup_password,
-                                },
-                                timeout=10,
-                            )
-                            if login_r.status_code == 200:
-                                data = _safe_json(login_r)
-                                token = data.get("access_token")
-                                if token:
-                                    st.session_state[SESSION_ACCESS_TOKEN] = token
-                                    st.rerun()
-                                else:
-                                    st.error(
-                                        "Account created. Please sign in on the Login tab."
-                                    )
+                            data = _safe_json(r)
+                            token = data.get("access_token")
+                            if token:
+                                st.session_state[SESSION_ACCESS_TOKEN] = token
+                                st.rerun()
                             else:
+                                login_r = requests.post(
+                                    f"{API_URL}/auth/login",
+                                    json={
+                                        "username": signup_username.strip(),
+                                        "password": signup_password,
+                                    },
+                                    timeout=10,
+                                )
+                                if login_r.status_code == 200:
+                                    login_data = _safe_json(login_r)
+                                    t = login_data.get("access_token")
+                                    if t:
+                                        st.session_state[SESSION_ACCESS_TOKEN] = t
+                                        st.rerun()
                                 st.success(
                                     "Account created. Please sign in on the Login tab."
                                 )
