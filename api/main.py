@@ -28,7 +28,6 @@ from core.config import (
     MAX_GOALS_PAGE_SIZE,
 )
 from core.database import Goal, User, get_session
-from core.schemas import GoalModel
 from goal_coach.agent import generate_smart_goal
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -143,6 +142,14 @@ app.add_middleware(
 
 class GenerateRequest(BaseModel):
     user_input: str
+    session_id: str | None = None
+
+
+class GenerateResponse(BaseModel):
+    session_id: str
+    refined_goal: str
+    key_results: list[str]
+    confidence_score: float
 
 
 class GoalCreateRequest(BaseModel):
@@ -153,11 +160,11 @@ class GoalCreateRequest(BaseModel):
     status: str = "draft"
 
 
-@app.post("/generate", response_model=GoalModel)
+@app.post("/generate", response_model=GenerateResponse)
 def post_generate(req: GenerateRequest, _user: User = Depends(get_current_user)):
-    """Generate a refined SMART goal from vague user input. Requires authentication."""
+    """Generate a refined SMART goal from vague user input. Optional session_id for iterative refinement. Requires authentication."""
     try:
-        result = generate_smart_goal(req.user_input)
+        result, session_id = generate_smart_goal(req.user_input, req.session_id)
     except Exception:
         logging.exception("generate_smart_goal failed")
         return JSONResponse(
@@ -169,7 +176,12 @@ def post_generate(req: GenerateRequest, _user: User = Depends(get_current_user))
             status_code=400,
             content={"message": "Input too vague or invalid to generate a goal."},
         )
-    return result
+    return GenerateResponse(
+        session_id=session_id,
+        refined_goal=result.refined_goal,
+        key_results=result.key_results,
+        confidence_score=result.confidence_score,
+    )
 
 
 @app.post("/goals")

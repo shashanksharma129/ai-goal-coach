@@ -37,3 +37,14 @@ def test_saved_goal_expander_label_omits_confidence():
     assert "0.87" not in label
     assert "Run a marathon" in label
     assert "Feb 22, 2026" in label
+
+
+def test_saved_goal_expander_label_shows_created_on_prefix():
+    """Label clearly indicates the date is creation date."""
+    goal = {
+        "refined_goal": "Read more books.",
+        "created_at": "2026-02-22T00:00:00+00:00",
+    }
+    label = _saved_goal_expander_label(goal)
+    assert "Created on Feb 22, 2026" in label
+    assert "Read more books" in label

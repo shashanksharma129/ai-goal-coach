@@ -176,11 +176,14 @@ def test_goals_get_401_without_token(fake_get_session):
 
 @patch("api.main.generate_smart_goal")
 def test_generate_success(mock_generate, fake_get_session, auth_headers):
-    """Successful /generate with valid token returns 200 and GoalModel JSON."""
-    mock_generate.return_value = GoalModel(
-        refined_goal="Improve public speaking.",
-        key_results=["Speak monthly", "Join Toastmasters", "Practice weekly"],
-        confidence_score=0.85,
+    """Successful /generate with valid token returns 200, session_id, and goal fields."""
+    mock_generate.return_value = (
+        GoalModel(
+            refined_goal="Improve public speaking.",
+            key_results=["Speak monthly", "Join Toastmasters", "Practice weekly"],
+            confidence_score=0.85,
+        ),
+        "sess-123",
     )
     with _with_fake_session(fake_get_session):
         client = TestClient(app)
@@ -191,6 +194,7 @@ def test_generate_success(mock_generate, fake_get_session, auth_headers):
         )
     assert resp.status_code == 200
     data = resp.json()
+    assert data["session_id"] == "sess-123"
     assert data["refined_goal"] == "Improve public speaking."
     assert data["confidence_score"] == 0.85
     assert len(data["key_results"]) == 3
@@ -199,10 +203,13 @@ def test_generate_success(mock_generate, fake_get_session, auth_headers):
 @patch("api.main.generate_smart_goal")
 def test_generate_400_low_confidence(mock_generate, fake_get_session, auth_headers):
     """When confidence_score < 0.5, /generate returns 400 with message."""
-    mock_generate.return_value = GoalModel(
-        refined_goal="Some goal.",
-        key_results=["A", "B", "C"],
-        confidence_score=0.2,
+    mock_generate.return_value = (
+        GoalModel(
+            refined_goal="Some goal.",
+            key_results=["A", "B", "C"],
+            confidence_score=0.2,
+        ),
+        "sess-any",
     )
     with _with_fake_session(fake_get_session):
         client = TestClient(app)
@@ -228,6 +235,36 @@ def test_generate_502_on_exception(mock_generate, fake_get_session, auth_headers
         )
     assert resp.status_code == 502
     assert resp.json()["message"] == "AI model failed to generate a valid response."
+
+
+@patch("api.main.generate_smart_goal")
+def test_generate_with_session_id_calls_agent_and_returns_session_id(
+    mock_generate, fake_get_session, auth_headers
+):
+    """POST /generate with session_id passes it to the agent and response includes session_id."""
+    mock_generate.return_value = (
+        GoalModel(
+            refined_goal="Updated goal.",
+            key_results=["A", "B", "C"],
+            confidence_score=0.8,
+        ),
+        "sess-456",
+    )
+    with _with_fake_session(fake_get_session):
+        client = TestClient(app)
+        resp = client.post(
+            "/generate",
+            json={
+                "user_input": "Make the deadline 6 months.",
+                "session_id": "sess-456",
+            },
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["session_id"] == "sess-456"
+    assert data["refined_goal"] == "Updated goal."
+    mock_generate.assert_called_once_with("Make the deadline 6 months.", "sess-456")
 
 
 def test_post_goals_persists(fake_get_session, in_memory_engine, auth_headers):

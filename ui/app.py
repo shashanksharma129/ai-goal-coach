@@ -21,10 +21,14 @@ SESSION_ACCESS_TOKEN = "access_token"
 SAVED_GOAL_SUMMARY_MAX_CHARS = 80
 
 
+# Label for saved-goal expander: "Created on MMM DD, YYYY" so the date is clearly creation date.
+_SAVED_GOAL_DATE_PREFIX = "Created on "
+
+
 def _saved_goal_expander_label(
     goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_MAX_CHARS
 ) -> str:
-    """Build expander label: truncated refined_goal + date."""
+    """Build expander label: truncated refined_goal and creation date (clearly labeled)."""
     text = (goal.get("refined_goal") or "").strip()
     summary = (text[:max_chars] + "…") if len(text) > max_chars else text
     date_str = ""
@@ -36,7 +40,7 @@ def _saved_goal_expander_label(
             raw = goal.get("created_at", "")
             date_str = raw[:10] if len(raw) >= 10 else ""
     if date_str:
-        return f"{summary} • {date_str}"
+        return f"{summary}  ·  {_SAVED_GOAL_DATE_PREFIX}{date_str}"
     return summary
 
 
@@ -169,7 +173,7 @@ def main():
             height=100,
         )
 
-        if st.button("Refine Goal"):
+        if st.button("Refine Goal", key="refine_goal_btn"):
             if not (user_input and user_input.strip()):
                 st.error("Please enter a goal or aspiration.")
             else:
@@ -190,6 +194,8 @@ def main():
                                 return
                             st.session_state["last_goal"] = data
                             st.session_state["last_original_input"] = user_input.strip()
+                            if data.get("session_id"):
+                                st.session_state["goal_session_id"] = data["session_id"]
                         elif r.status_code == 401:
                             _clear_auth_and_rerun()
                             return
@@ -218,14 +224,88 @@ def main():
 
         if "last_goal" in st.session_state:
             goal = st.session_state["last_goal"]
-            st.subheader("Refined goal")
-            st.write(goal["refined_goal"])
-            st.subheader("Key results")
-            for kr in goal["key_results"]:
-                st.markdown(f"- {kr}")
-            st.metric("Confidence score", f"{goal['confidence_score']:.2f}")
+            with st.container(border=True):
+                st.subheader("Refined goal")
+                st.write(goal["refined_goal"])
+                st.subheader("Key results")
+                for kr in goal["key_results"]:
+                    st.markdown(f"- {kr}")
+                st.metric("Confidence score", f"{goal['confidence_score']:.2f}")
 
-            if st.button("Save Approved Goal"):
+            st.divider()
+            with st.container(border=True):
+                st.subheader("Refine further")
+                st.caption(
+                    "Ask for changes—tone, deadline, constraints—and get an updated goal."
+                )
+                feedback_key = "refine_further_feedback"
+                feedback = st.text_area(
+                    "Your feedback",
+                    placeholder="e.g. Make the deadline 6 months, or add a key result about finishing 2 books.",
+                    height=80,
+                    key=feedback_key,
+                )
+                refine_further_clicked = st.button(
+                    "Refine further", key="refine_further_btn"
+                )
+            if refine_further_clicked:
+                sid = st.session_state.get("goal_session_id")
+                if not (feedback and feedback.strip()):
+                    st.error("Please enter feedback.")
+                elif not sid:
+                    st.error("Session lost. Refine a new goal above to start over.")
+                else:
+                    with st.spinner("Applying your feedback..."):
+                        try:
+                            r = requests.post(
+                                f"{API_URL}/generate",
+                                json={
+                                    "user_input": feedback.strip(),
+                                    "session_id": sid,
+                                },
+                                headers=_auth_headers(),
+                                timeout=60,
+                            )
+                            if r.status_code == 200:
+                                data = _safe_json(r)
+                                if data and "refined_goal" in data:
+                                    st.session_state["last_goal"] = data
+                                    if data.get("session_id"):
+                                        st.session_state["goal_session_id"] = data[
+                                            "session_id"
+                                        ]
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "Invalid response from server. Please try again."
+                                    )
+                            elif r.status_code == 401:
+                                _clear_auth_and_rerun()
+                                return
+                            elif r.status_code == 400:
+                                body = _safe_json(r)
+                                st.error(
+                                    body.get(
+                                        "message",
+                                        r.text or "Input too vague or invalid.",
+                                    )
+                                )
+                            elif r.status_code == 502:
+                                body = _safe_json(r)
+                                st.error(
+                                    body.get(
+                                        "message",
+                                        r.text
+                                        or "AI model failed to generate a valid response.",
+                                    )
+                                )
+                            else:
+                                st.error(f"Unexpected error: {r.status_code}")
+                        except requests.RequestException as e:
+                            st.error(f"Could not reach the API: {e}")
+
+            st.caption("Happy with this version? Save it to your list.")
+            if st.button("Save Approved Goal", key="save_goal_btn"):
                 original = st.session_state.get("last_original_input", "")
                 try:
                     r = requests.post(
@@ -242,7 +322,11 @@ def main():
                     )
                     if r.status_code == 200:
                         st.success("Goal saved. Check the Saved goals tab.")
-                        for key in ("last_goal", "last_original_input"):
+                        for key in (
+                            "last_goal",
+                            "last_original_input",
+                            "goal_session_id",
+                        ):
                             if key in st.session_state:
                                 del st.session_state[key]
                         st.rerun()
