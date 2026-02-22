@@ -133,22 +133,8 @@ def _render_login_signup():
                                 st.session_state[SESSION_ACCESS_TOKEN] = token
                                 st.rerun()
                             else:
-                                login_r = requests.post(
-                                    f"{API_URL}/auth/login",
-                                    json={
-                                        "username": signup_username.strip(),
-                                        "password": signup_password,
-                                    },
-                                    timeout=10,
-                                )
-                                if login_r.status_code == 200:
-                                    login_data = _safe_json(login_r)
-                                    t = login_data.get("access_token")
-                                    if t:
-                                        st.session_state[SESSION_ACCESS_TOKEN] = t
-                                        st.rerun()
-                                st.success(
-                                    "Account created. Please sign in on the Login tab."
+                                st.error(
+                                    "Invalid response from server (no token). Please sign in on the Login tab."
                                 )
                         elif r.status_code == 409:
                             st.error("Username already taken.")

@@ -31,13 +31,17 @@ DUMMY_PASSWORD_HASH = "$2b$12$DbmI/yRDB5j9Q8I7R9cb5.9jZPh/c32i4pA35t4vTf2jdq32n.
 
 def hash_password(plain: str) -> str:
     """Return a bcrypt hash of the plain-text password (UTF-8, truncated at 72 bytes)."""
-    raw = plain.encode("utf-8")[:_BCRYPT_MAX_PASSWORD_BYTES]
+    raw = plain.encode("utf-8")
+    if len(raw) > _BCRYPT_MAX_PASSWORD_BYTES:
+        raw = raw[:_BCRYPT_MAX_PASSWORD_BYTES]
     return bcrypt.hashpw(raw, bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return True if the plain password matches the hash."""
-    raw = plain.encode("utf-8")[:_BCRYPT_MAX_PASSWORD_BYTES]
+    raw = plain.encode("utf-8")
+    if len(raw) > _BCRYPT_MAX_PASSWORD_BYTES:
+        raw = raw[:_BCRYPT_MAX_PASSWORD_BYTES]
     return bcrypt.checkpw(raw, hashed.encode("ascii"))
 
 

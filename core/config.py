@@ -14,7 +14,7 @@ MAX_GOALS_PAGE_SIZE = 100
 _SECRET_KEY = os.environ.get("SECRET_KEY")
 if not _SECRET_KEY:
     raise ValueError(
-        "SECRET_KEY environment variable must be set. For local dev, add SECRET_KEY=your-secret to .env."
+        "SECRET_KEY environment variable must be set. In .env use SECRET_KEY=any-value (e.g. SECRET_KEY=my-local-secret)."
     )
 SECRET_KEY = _SECRET_KEY
 ALGORITHM = "HS256"
