@@ -14,9 +14,9 @@ try:
 except ImportError:
     pass
 
-from core.config import DEFAULT_GOALS_PAGE_SIZE
-
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
+# Page size for Saved goals list; keep in sync with API default if changed.
+DEFAULT_GOALS_PAGE_SIZE = 20
 SESSION_ACCESS_TOKEN = "access_token"
 SAVED_GOAL_SUMMARY_MAX_CHARS = 80
 
