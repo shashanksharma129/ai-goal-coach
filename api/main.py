@@ -123,7 +123,7 @@ def _goal_to_json(goal: Goal) -> dict:
         "id": str(goal.id),
         "original_input": goal.original_input,
         "refined_goal": goal.refined_goal,
-        "key_results": json.loads(goal.key_results),
+        "key_results": json.loads(goal.key_results) if goal.key_results else [],
         "confidence_score": goal.confidence_score,
         "status": goal.status,
         "created_at": goal.created_at.isoformat(),
