@@ -1,161 +1,126 @@
 # AI Goal Coach
 
-A small system that turns vague aspirations into structured SMART goals using a single LLM call. Built with FastAPI, Google ADK (Gemini 2.5 Flash), SQLite, and Streamlit.
+Turns vague aspirations into structured SMART goals in one LLM call. Users sign up or log in; goals are refined and saved per account. Stack: FastAPI, Google ADK (Gemini 2.5 Flash), SQLite, Streamlit.
+
+This README is the **architecture decision record**: it explains design choices first, then [setup](#setup-and-run).
 
 ---
 
-## Design and architecture
+## 1. Why this AI model (Gemini 2.5 Flash)
 
-### Why this AI model (Gemini 2.5 Flash)
+- **Speed and cost:** One fast, cheap call per goal. Flash gives low latency and low cost ([core/telemetry.py](core/telemetry.py): $0.075/1M input, $0.30/1M output).
+- **Fit for task:** We need “refine goal + 3–5 key results + confidence.” No multi-step reasoning or tools; Flash is enough.
+- **Simplicity:** One API key (`GEMINI_API_KEY`), no extra auth or hosting.
 
-- **Speed and cost:** We need one fast, cheap call per goal. Flash gives low latency and low cost per request (see [core/telemetry.py](core/telemetry.py): $0.075/1M input, $0.30/1M output), which is enough for a prototype and moderate traffic.
-- **Single-shot quality:** The task is "refine one goal + 3–5 key results + confidence." We did not need multi-step reasoning or tool use; Flash is sufficient for this scope.
-- **Availability:** Google AI Studio and a single API key (`GEMINI_API_KEY`) keep integration simple; no separate auth or model-hosting infra.
+**Trade-off:** We gave up the higher reasoning quality of larger models (e.g. Gemini Pro). For ambiguous or adversarial input we could add a review step or fallback to a larger model later.
 
-**Trade-off:** We gave up the higher reasoning quality of larger models (e.g. Gemini Pro) to keep latency and cost low. If we later need better handling of very ambiguous or adversarial input, we can introduce a second "review" step or a fallback to a larger model for low-confidence cases.
+---
 
-### Why this method for JSON enforcement (ADK `output_schema`)
+## 2. Why this method for JSON enforcement (ADK `output_schema`)
 
-We need the LLM’s answer to be **strictly** a `GoalModel`: `refined_goal`, `key_results` (3–5 strings), `confidence_score` (0–1). Two options:
+We need strict `GoalModel` output: `refined_goal`, `key_results` (3–5 strings), `confidence_score` (0–1).
 
-1. **Prompt-only:** Ask the model to "return JSON" and parse with Pydantic. Any malformed or extra output forces retries or brittle parsing.
-2. **Schema-bound (chosen):** Use Google ADK’s `output_schema=GoalModel` so the request to the model asks for structured output that conforms to the schema. Invalid or non-conforming responses are rejected at the boundary; we return 502 and never pass bad data to the API or DB.
+- **Prompt-only:** Ask for JSON and parse with Pydantic → malformed output forces retries or brittle parsing.
+- **Schema-bound (chosen):** ADK `output_schema=GoalModel` → model returns structured output; invalid responses are rejected at the boundary, we return 502 and never pass bad data through.
 
-We chose (2) so that the API contract is enforceable by the framework and we avoid silent corruption or repeated retries.
+We chose schema-bound so the API contract is enforceable and we avoid silent corruption.
 
-### Trade-offs and what we sacrificed for speed
+---
+
+## 3. Trade-offs: what we sacrificed for speed
 
 | Choice | Benefit | Sacrifice |
 |--------|---------|-----------|
-| **Gemini Flash (not Pro)** | Low latency, low cost | Some reasoning depth; may be weaker on edge/adversarial cases |
-| **Single agent, one call** | Simple flow, no chain latency | No in-process "refine again" or validator agent |
-| **SQLite** | No DB server, easy local/Docker runs | No high write concurrency; single-file limits |
-| **Telemetry to stdout** | No extra backends or SDKs | Dashboards/alerting require a log pipeline |
-| **No auth in prototype** | Fast to build and test | Not suitable for multi-tenant production as-is |
+| Gemini Flash (not Pro) | Low latency, low cost | Weaker on edge/adversarial cases |
+| Single agent, one call | Simple flow, no chain latency | No “refine again” or validator agent |
+| SQLite | No DB server, easy local/Docker | No high write concurrency |
+| Telemetry to stdout | No extra backends | Dashboards need a log pipeline |
+| JWT auth, goals per user | Multi-tenant isolation | Token/session handling in UI |
 
-We optimized for **getting a working, correct prototype quickly** and for **predictable JSON and cost**. We did not optimize for high concurrency, multi-tenancy, or deep reasoning.
+We optimized for a correct, fast prototype and predictable JSON and cost; we did not optimize for high concurrency or deep reasoning.
 
-### Scaling to ~10,000 users
+---
 
-At prototype scale the current design is adequate. For ~10k users we would change the following:
+## 4. Scaling to ~10,000 users
 
-1. **Database:** Replace SQLite with a managed RDBMS (e.g. PostgreSQL). Use connection pooling and run migrations (e.g. Alembic). Keep `Goal` and the same API contract; only the engine and deployment change.
-2. **API and concurrency:** Run FastAPI behind a production ASGI server (e.g. Uvicorn with workers or behind a reverse proxy). Add rate limiting and optional request queuing so the LLM is not overloaded.
-3. **Caching:** Cache results for identical or near-identical `user_input` (e.g. hash + TTL) to reduce duplicate Gemini calls and latency.
-4. **Observability:** Ship stdout logs to a log/metrics platform (e.g. GCP Cloud Logging, Datadog). Optionally add OpenTelemetry and export spans/metrics so we can monitor P95 latency, error rate, and cost per user or per day.
-5. **Auth and multi-tenancy:** Add authentication (e.g. JWT or OAuth) and scope goals by user/tenant. Use row-level security or tenant IDs so data is isolated.
-6. **Model and quality:** If Flash quality is insufficient under load or for edge cases, add a fallback path (e.g. retry with Gemini Pro for low-confidence or after user feedback) or a small "review" step without changing the main flow for the majority of requests.
+Current design is adequate at prototype scale. For ~10k users we would:
+
+1. **Database:** Replace SQLite with a managed RDBMS (e.g. PostgreSQL), connection pooling, migrations (e.g. Alembic). Same `Goal` contract.
+2. **API and concurrency:** Production ASGI server (e.g. Uvicorn with workers), rate limiting, optional request queuing for the LLM.
+3. **Caching:** Cache by `user_input` (hash + TTL) to cut duplicate Gemini calls.
+4. **Observability:** Ship logs to a platform (e.g. GCP, Datadog); optional OpenTelemetry for latency, error rate, cost.
+5. **Auth:** Already implemented ([Authentication and multi-tenancy](#authentication-and-multi-tenancy)). Goals scoped by `user_id` in app code. At 10k we could add row-level security (RLS) in the DB as defense-in-depth.
+6. **Model quality:** If Flash is insufficient, add a fallback (e.g. Gemini Pro for low-confidence) or a small review step.
 
 Update this README when any of these are adopted.
 
 ---
 
+## Authentication and multi-tenancy
+
+- **Sign up:** POST `/auth/signup` with `{"username", "password"}` → 201. Passwords hashed ([core/auth.py](core/auth.py)), never stored plain.
+- **Login:** POST `/auth/login` → `{"access_token", "token_type": "bearer"}`. UI sends `Authorization: Bearer <token>` on `/generate` and `/goals`.
+- **Isolation:** Goals stored with `user_id`; GET/POST `/goals` only touch the authenticated user’s data.
+
+UI: Login / Sign up when unauthenticated; after login, Refine and Saved goals tabs; Logout in sidebar.
+
+---
+
 ## Architecture overview
 
-- **UI:** [Streamlit](ui/app.py) – two tabs: **Refine** (input → POST `/generate`, view result, POST `/goals` to save) and **Saved goals** (GET `/goals`, list saved goals with pagination).
-- **API:** [FastAPI](api/main.py) → POST `/generate`, POST `/goals`, GET `/goals` (list, newest first, paginated). Calls [goal_coach](goal_coach/agent.py) (`generate_smart_goal`) and [core/database.py](core/database.py). Returns 400 when confidence &lt; 0.5, 502 on model/schema failure.
-- **Agent:** [goal_coach](goal_coach/agent.py) – Google ADK Agent with `output_schema=GoalModel`, model `gemini-2.5-flash`. [core/telemetry.py](core/telemetry.py) logs one JSON line per run to stdout.
-- **Storage:** SQLite ([Goal](core/database.py) table); path via `GOALS_DB_PATH` (default `goals.db`).
+- **UI** ([ui/app.py](ui/app.py)): Login/Sign up → Refine (POST `/generate`, then POST `/goals` to save) and Saved goals (GET `/goals`, paginated).
+- **API** ([api/main.py](api/main.py)): `/auth/signup`, `/auth/login`; `/generate`, `/goals` (JWT required, goals scoped by user). 400 low confidence/bad input, 401 unauthenticated, 502 model/schema failure.
+- **Agent** ([goal_coach/agent.py](goal_coach/agent.py)): ADK agent, `output_schema=GoalModel`, `gemini-2.5-flash`. [core/telemetry.py](core/telemetry.py) logs one JSON line per run.
+- **Storage** ([core/database.py](core/database.py)): SQLite, `users` + `goals` (with `user_id`); `GOALS_DB_PATH` (default `goals.db`).
 
-See [docs/spec.md](docs/spec.md) for the full system specification.
+Code: `ABOUTME` at top of modules, docstrings on public APIs, unit and integration tests. See [docs/spec.md](docs/spec.md) for full spec.
 
 ---
 
 ## Setup and run
 
-### Prerequisites
+**Prerequisites:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [Gemini API key](https://aistudio.google.com/apikey). With Docker: Docker Compose + API key.
 
-- **Without Docker:** Python 3.11+, [uv](https://docs.astral.sh/uv/), and a [Gemini API key](https://aistudio.google.com/apikey).
-- **With Docker:** Docker and Docker Compose, and a Gemini API key.
+### Without Docker
 
----
-
-### Run without Docker
-
-1. **Clone and install**
+1. Clone, install, set API key:
    ```bash
    git clone <repo-url>
    cd ai-goal-coach
    uv sync
    ```
+   Add a `.env` in the project root (in `.gitignore`): `GEMINI_API_KEY=your_key_here`
 
-2. **Set the Gemini API key**
-   Create a `.env` file in the project root (it is in `.gitignore`; do not commit it):
-   ```bash
-   GEMINI_API_KEY=your_key_here
-   ```
-   The API and Streamlit app load `.env` via `python-dotenv`.
+2. Start API: `uv run uvicorn api.main:app --reload --port 8000`
 
-3. **Start the API** (in one terminal)
-   ```bash
-   uv run uvicorn api.main:app --reload --port 8000
-   ```
+3. Start UI (other terminal): `uv run streamlit run ui/app.py --server.port 8501`
 
-4. **Start the UI** (in another terminal)
-   ```bash
-   uv run streamlit run ui/app.py --server.port 8501
-   ```
+4. Open http://localhost:8501 → Sign up or Login → Refine tab (refine goal, save) or Saved goals (list, paginated). Logout in sidebar.
 
-5. **Use the app**
-   - Open http://localhost:8501.
-   - **Refine** tab: Enter a goal or aspiration, click "Refine Goal", then "Save Approved Goal" to persist it.
-   - **Saved goals** tab: View all saved goals (newest first) with pagination.
+Optional: `uv run adk web` for ADK web UI.
 
-6. **Optional: ADK web UI**
-   From the project root: `uv run adk web` (discovers the `goal_coach` agent).
+### With Docker
 
----
+1. Set `GEMINI_API_KEY` (e.g. in `.env` in project root; Compose injects it; do not commit).
+2. `docker compose up --build`
+3. UI: http://localhost:8501, API: http://localhost:8000. SQLite in `goal_data` volume.
 
-### Run with Docker
-
-1. **Ensure the API can see your Gemini API key** (see [Passing the Gemini API key securely](#passing-the-gemini-api-key-securely) below).
-
-2. **Build and start**
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Use the app**
-   - UI: http://localhost:8501  
-   - API: http://localhost:8000  
-   - SQLite is stored in the `goal_data` volume for persistence.
-
-#### Passing the Gemini API key securely
-
-The API container needs `GEMINI_API_KEY` to call Gemini. **Never commit the key or bake it into images.** Use one of these:
-
-- **Option A — `.env` file (recommended for local/dev)**  
-  Create a `.env` in the project root with:
-  ```bash
-  GEMINI_API_KEY=your_key_here
-  ```
-  Docker Compose reads `.env` from the project directory and substitutes `${GEMINI_API_KEY}` into the compose file, so the value is passed into the container at runtime. The file is listed in `.gitignore`, so it is not committed.
-
-- **Option B — Export in the shell**  
-  In the same shell where you run Compose:
-  ```bash
-  export GEMINI_API_KEY=your_key_here
-  docker compose up --build
-  ```
-  The key is not written to a file (assuming your shell history is protected).
-
-- **Option C — Production**  
-  Use a secrets manager or Docker secrets; inject the key at runtime and do not store it in repo or in plain env files in production.
-
----
+Never commit the key; for production use a secrets manager or Docker secrets.
 
 ### Tests
 
-- Unit tests (no API key): `uv run pytest -m "not integration" -v`
-- Live evals (requires `GEMINI_API_KEY`): `uv run pytest -m integration -v`
+- Unit (no API key): `uv run pytest -m "not integration" -v`
+- Integration (needs `GEMINI_API_KEY`): `uv run pytest -m integration -v`
 
 ---
 
 ## Project layout
 
-- `api/` – FastAPI app (`api/main.py`: `/generate`, `/goals`)
-- `ui/` – Streamlit UI (`ui/app.py`)
-- `core/` – Shared config, database, schemas, telemetry
-- `goal_coach/` – Agent package (`agent.py` with `root_agent` and `generate_smart_goal`)
-- `docs/` – Spec, plans, and other documentation
-- `tests/` – Unit and integration tests
+| Dir | Purpose |
+|-----|---------|
+| `api/` | FastAPI: `/auth/signup`, `/auth/login`, `/generate`, `/goals` |
+| `ui/` | Streamlit app |
+| `core/` | Config, database, schemas, telemetry, auth |
+| `goal_coach/` | ADK agent (`generate_smart_goal`) |
+| `docs/` | Spec and plans |
+| `tests/` | Unit and integration tests |

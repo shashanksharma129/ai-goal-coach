@@ -21,7 +21,7 @@ SAVED_GOAL_SUMMARY_MAX_CHARS = 80
 
 
 def _saved_goal_expander_label(goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_MAX_CHARS) -> str:
-    """Build expander label: truncated refined_goal + date + confidence."""
+    """Build expander label: truncated refined_goal + date."""
     text = (goal.get("refined_goal") or "").strip()
     summary = (text[:max_chars] + "…") if len(text) > max_chars else text
     date_str = ""
@@ -32,11 +32,9 @@ def _saved_goal_expander_label(goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_M
         except (ValueError, TypeError):
             raw = goal.get("created_at", "")
             date_str = raw[:10] if len(raw) >= 10 else ""
-    confidence = goal.get("confidence_score")
-    conf_str = f"{confidence:.2f}" if confidence is not None else "—"
     if date_str:
-        return f"{summary} • {date_str} • {conf_str}"
-    return f"{summary} • {conf_str}"
+        return f"{summary} • {date_str}"
+    return summary
 
 
 def _safe_json(response: requests.Response):
@@ -285,9 +283,6 @@ def main():
                     st.caption("**Key results**")
                     for kr in g["key_results"]:
                         st.markdown(f"- {kr}")
-                confidence = g.get("confidence_score")
-                if confidence is not None:
-                    st.metric("Confidence score", f"{confidence:.2f}")
         col_prev, col_next = st.columns(2)
         with col_prev:
             if st.button("Previous", disabled=(page <= 1), key="prev_goals"):
