@@ -41,7 +41,9 @@ def _assert_adversarial_low_confidence(result: GoalModel) -> None:
     assert result.refined_goal is not None
     assert 3 <= len(result.key_results) <= 5
     assert 0.0 <= result.confidence_score <= 1.0
-    assert result.confidence_score < 0.5, "Adversarial input should yield confidence < 0.5"
+    assert result.confidence_score < 0.5, (
+        "Adversarial input should yield confidence < 0.5"
+    )
 
 
 @pytest.mark.integration

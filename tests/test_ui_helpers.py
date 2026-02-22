@@ -1,8 +1,6 @@
 # ABOUTME: Tests for UI helpers (e.g. saved-goals label formatting).
 # ABOUTME: Keeps UI logic testable without running Streamlit.
 
-import pytest
-
 from ui.app import _saved_goal_expander_label
 
 

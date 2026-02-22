@@ -40,12 +40,7 @@ def _sanitize_user_input(raw: str | None) -> str:
     # Truncate raw first so user content is respected up to the limit and we avoid broken entities from truncating after escaping.
     bounded = raw[:MAX_USER_INPUT_LENGTH]
     # Escape angle brackets so no tag (any case or nesting) can form and break out of <user_goal> block.
-    return (
-        bounded.replace("\x00", "")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .strip()
-    )
+    return bounded.replace("\x00", "").replace("<", "&lt;").replace(">", "&gt;").strip()
 
 
 def _goal_instruction_provider(_ctx: ReadonlyContext) -> str:
@@ -92,12 +87,10 @@ def generate_smart_goal(user_input: str) -> GoalModel:
         new_message=content,
     ):
         if event.usage_metadata:
-            prompt_tokens += getattr(
-                event.usage_metadata, "prompt_token_count", 0
-            ) or 0
-            completion_tokens += getattr(
-                event.usage_metadata, "candidates_token_count", 0
-            ) or 0
+            prompt_tokens += getattr(event.usage_metadata, "prompt_token_count", 0) or 0
+            completion_tokens += (
+                getattr(event.usage_metadata, "candidates_token_count", 0) or 0
+            )
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
                 if part.text:
@@ -107,13 +100,11 @@ def generate_smart_goal(user_input: str) -> GoalModel:
                 break
 
     latency_ms = (time.perf_counter() - start) * 1000
-    success = False
     confidence_score: float | None = None
 
     if final_text:
         try:
             model = GoalModel.model_validate_json(final_text)
-            success = True
             confidence_score = model.confidence_score
             log_run(
                 latency_ms=latency_ms,

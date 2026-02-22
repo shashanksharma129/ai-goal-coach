@@ -67,6 +67,7 @@ def test_validate_username_raises_empty():
 def test_validate_username_raises_too_long():
     """Username over MAX_USERNAME_LENGTH raises ValueError."""
     from core.config import MAX_USERNAME_LENGTH
+
     with pytest.raises(ValueError, match="at most"):
         validate_username("a" * (MAX_USERNAME_LENGTH + 1))
 
@@ -83,4 +84,9 @@ def test_decode_access_token_invalid_returns_none():
     """Invalid or malformed token decodes to None."""
     assert decode_access_token("not-a-jwt") is None
     assert decode_access_token("") is None
-    assert decode_access_token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub3QtdXVpZCJ9.x") is None
+    assert (
+        decode_access_token(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub3QtdXVpZCJ9.x"
+        )
+        is None
+    )

@@ -3,7 +3,7 @@
 
 import json
 import logging
-from dotenv import load_dotenv
+
 from fastapi import APIRouter, Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,9 +12,6 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import select
 
-load_dotenv()
-
-from goal_coach.agent import generate_smart_goal
 from core.auth import (
     create_access_token,
     get_current_user,
@@ -30,6 +27,7 @@ from core.config import (
 )
 from core.database import Goal, User, get_session
 from core.schemas import GoalModel
+from goal_coach.agent import generate_smart_goal
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -191,7 +189,11 @@ def get_goals(
     """List saved goals for the authenticated user, newest first. Returns { goals: [...], total: N }."""
     try:
         with get_session() as session:
-            total_stmt = select(func.count()).select_from(Goal).where(Goal.user_id == current_user.id)
+            total_stmt = (
+                select(func.count())
+                .select_from(Goal)
+                .where(Goal.user_id == current_user.id)
+            )
             total = session.exec(total_stmt).one()
             stmt = (
                 select(Goal)

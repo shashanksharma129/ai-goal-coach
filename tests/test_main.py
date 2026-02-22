@@ -53,12 +53,15 @@ def auth_headers(fake_get_session, in_memory_engine):
 
 def _with_fake_session(fake_get_session):
     """Patch get_session in api and auth (where it is imported) so all app code uses the in-memory DB."""
+
     @contextmanager
     def _both():
-        with patch("api.main.get_session", fake_get_session), patch(
-            "core.auth.get_session", fake_get_session
+        with (
+            patch("api.main.get_session", fake_get_session),
+            patch("core.auth.get_session", fake_get_session),
         ):
             yield
+
     return _both()
 
 
@@ -80,8 +83,12 @@ def test_auth_signup_409_when_username_taken(fake_get_session):
     """POST /auth/signup with existing username returns 409."""
     with _with_fake_session(fake_get_session):
         client = TestClient(app)
-        client.post("/auth/signup", json={"username": "taken", "password": "password123"})
-        resp = client.post("/auth/signup", json={"username": "taken", "password": "other456"})
+        client.post(
+            "/auth/signup", json={"username": "taken", "password": "password123"}
+        )
+        resp = client.post(
+            "/auth/signup", json={"username": "taken", "password": "other456"}
+        )
     assert resp.status_code == 409
     assert "already taken" in resp.json().get("message", "").lower()
 

@@ -7,9 +7,7 @@ from pydantic import BaseModel, Field
 class GoalModel(BaseModel):
     """Structured output from the goal-refinement agent."""
 
-    refined_goal: str = Field(
-        description="The SMART version of the user's goal."
-    )
+    refined_goal: str = Field(description="The SMART version of the user's goal.")
     key_results: list[str] = Field(
         description="3 to 5 measurable key results.",
         min_length=3,

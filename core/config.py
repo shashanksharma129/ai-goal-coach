@@ -3,6 +3,10 @@
 
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 DEFAULT_GOALS_PAGE_SIZE = 20
 MAX_GOALS_PAGE_SIZE = 100
 
@@ -13,7 +17,9 @@ _DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
 def _parse_access_token_expire_minutes() -> int:
-    raw = os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", str(_DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES))
+    raw = os.environ.get(
+        "ACCESS_TOKEN_EXPIRE_MINUTES", str(_DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     try:
         return int(raw)
     except ValueError:

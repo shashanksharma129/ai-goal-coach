@@ -27,13 +27,13 @@ _BCRYPT_MAX_PASSWORD_BYTES = 72
 
 def hash_password(plain: str) -> str:
     """Return a bcrypt hash of the plain-text password (UTF-8, truncated at 72 bytes)."""
-    raw = plain.encode("utf-8")[: _BCRYPT_MAX_PASSWORD_BYTES]
+    raw = plain.encode("utf-8")[:_BCRYPT_MAX_PASSWORD_BYTES]
     return bcrypt.hashpw(raw, bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return True if the plain password matches the hash."""
-    raw = plain.encode("utf-8")[: _BCRYPT_MAX_PASSWORD_BYTES]
+    raw = plain.encode("utf-8")[:_BCRYPT_MAX_PASSWORD_BYTES]
     return bcrypt.checkpw(raw, hashed.encode("ascii"))
 
 

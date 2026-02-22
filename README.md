@@ -112,6 +112,15 @@ Never commit the key; for production use a secrets manager or Docker secrets.
 - Unit (no API key): `uv run pytest -m "not integration" -v`
 - Integration (needs `GEMINI_API_KEY`): `uv run pytest -m integration -v`
 
+### Linting and formatting (Ruff)
+
+We use [Ruff](https://docs.astral.sh/ruff/) for linting and formatting. Install dev deps, then run:
+
+- **Lint:** `uv run ruff check .`
+- **Format:** `uv run ruff format .`
+
+Ruff is in the `dev` optional dependency group (`uv sync --extra dev`).
+
 ---
 
 ## Project layout

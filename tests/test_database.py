@@ -48,6 +48,9 @@ def test_goal_create_save_and_retrieve(session):
     assert read is not None
     assert read.id == goal_id
     assert read.original_input == "I want to get better at public speaking."
-    assert read.refined_goal == "Improve public speaking skills by delivering 2 talks per quarter."
+    assert (
+        read.refined_goal
+        == "Improve public speaking skills by delivering 2 talks per quarter."
+    )
     assert read.confidence_score == 0.85
     assert read.status == "draft"

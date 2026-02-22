@@ -13,10 +13,9 @@ OUTPUT_COST_PER_1M = 0.30
 
 def estimate_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
     """Estimate cost in USD for Gemini 2.5 Flash."""
-    return (
-        (prompt_tokens / 1_000_000) * INPUT_COST_PER_1M
-        + (completion_tokens / 1_000_000) * OUTPUT_COST_PER_1M
-    )
+    return (prompt_tokens / 1_000_000) * INPUT_COST_PER_1M + (
+        completion_tokens / 1_000_000
+    ) * OUTPUT_COST_PER_1M
 
 
 @dataclass

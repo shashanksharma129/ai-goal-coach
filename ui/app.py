@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -20,7 +21,9 @@ SESSION_ACCESS_TOKEN = "access_token"
 SAVED_GOAL_SUMMARY_MAX_CHARS = 80
 
 
-def _saved_goal_expander_label(goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_MAX_CHARS) -> str:
+def _saved_goal_expander_label(
+    goal: dict, max_chars: int = SAVED_GOAL_SUMMARY_MAX_CHARS
+) -> str:
     """Build expander label: truncated refined_goal + date."""
     text = (goal.get("refined_goal") or "").strip()
     summary = (text[:max_chars] + "…") if len(text) > max_chars else text
@@ -70,7 +73,9 @@ def _render_login_signup():
     with tab_login:
         with st.form("login_form"):
             login_username = st.text_input("Username", key="login_username")
-            login_password = st.text_input("Password", type="password", key="login_password")
+            login_password = st.text_input(
+                "Password", type="password", key="login_password"
+            )
             if st.form_submit_button("Sign in"):
                 if not (login_username and login_username.strip() and login_password):
                     st.error("Enter username and password.")
@@ -78,7 +83,10 @@ def _render_login_signup():
                     try:
                         r = requests.post(
                             f"{API_URL}/auth/login",
-                            json={"username": login_username.strip(), "password": login_password},
+                            json={
+                                "username": login_username.strip(),
+                                "password": login_password,
+                            },
                             timeout=10,
                         )
                         if r.status_code == 200:
@@ -91,28 +99,40 @@ def _render_login_signup():
                                 st.error("Invalid response from server.")
                         else:
                             body = _safe_json(r)
-                            st.error(body.get("message", "Invalid username or password."))
+                            st.error(
+                                body.get("message", "Invalid username or password.")
+                            )
                     except requests.RequestException as e:
                         st.error(f"Could not reach the API: {e}")
 
     with tab_signup:
         with st.form("signup_form"):
             signup_username = st.text_input("Username", key="signup_username")
-            signup_password = st.text_input("Password", type="password", key="signup_password")
+            signup_password = st.text_input(
+                "Password", type="password", key="signup_password"
+            )
             if st.form_submit_button("Create account"):
-                if not (signup_username and signup_username.strip() and signup_password):
+                if not (
+                    signup_username and signup_username.strip() and signup_password
+                ):
                     st.error("Enter username and password.")
                 else:
                     try:
                         r = requests.post(
                             f"{API_URL}/auth/signup",
-                            json={"username": signup_username.strip(), "password": signup_password},
+                            json={
+                                "username": signup_username.strip(),
+                                "password": signup_password,
+                            },
                             timeout=10,
                         )
                         if r.status_code == 201:
                             login_r = requests.post(
                                 f"{API_URL}/auth/login",
-                                json={"username": signup_username.strip(), "password": signup_password},
+                                json={
+                                    "username": signup_username.strip(),
+                                    "password": signup_password,
+                                },
                                 timeout=10,
                             )
                             if login_r.status_code == 200:
@@ -122,9 +142,13 @@ def _render_login_signup():
                                     st.session_state[SESSION_ACCESS_TOKEN] = token
                                     st.rerun()
                                 else:
-                                    st.error("Account created. Please sign in on the Login tab.")
+                                    st.error(
+                                        "Account created. Please sign in on the Login tab."
+                                    )
                             else:
-                                st.success("Account created. Please sign in on the Login tab.")
+                                st.success(
+                                    "Account created. Please sign in on the Login tab."
+                                )
                         elif r.status_code == 409:
                             st.error("Username already taken.")
                         elif r.status_code == 400:
@@ -173,7 +197,9 @@ def main():
                         if r.status_code == 200:
                             data = _safe_json(r)
                             if not data or "refined_goal" not in data:
-                                st.error("Invalid response from server. Please try again.")
+                                st.error(
+                                    "Invalid response from server. Please try again."
+                                )
                                 return
                             st.session_state["last_goal"] = data
                             st.session_state["last_original_input"] = user_input.strip()
@@ -182,12 +208,18 @@ def main():
                             return
                         elif r.status_code == 400:
                             body = _safe_json(r)
-                            msg = body.get("message", r.text or "Input too vague or invalid.")
+                            msg = body.get(
+                                "message", r.text or "Input too vague or invalid."
+                            )
                             st.error(msg)
                             return
                         elif r.status_code == 502:
                             body = _safe_json(r)
-                            msg = body.get("message", r.text or "AI model failed to generate a valid response.")
+                            msg = body.get(
+                                "message",
+                                r.text
+                                or "AI model failed to generate a valid response.",
+                            )
                             st.error(msg)
                             return
                         else:
@@ -289,7 +321,9 @@ def main():
                 st.session_state["saved_goals_page"] = page - 1
                 st.rerun()
         with col_next:
-            if st.button("Next", disabled=(offset + len(goals) >= total), key="next_goals"):
+            if st.button(
+                "Next", disabled=(offset + len(goals) >= total), key="next_goals"
+            ):
                 st.session_state["saved_goals_page"] = page + 1
                 st.rerun()
 
